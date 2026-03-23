@@ -1,0 +1,289 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum PhaseType {
+  PLANNING
+  DESIGN
+  DEV
+  TESTING
+  DEPLOY
+}
+
+enum PhaseStatus {
+  LOCKED
+  ACTIVE
+  COMPLETED
+}
+
+enum ItemStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum ItemSource {
+  AI
+  USER
+}
+
+enum EntryType {
+  OBSTACLE
+  WIN
+  DECISION
+}
+
+enum EntrySource {
+  MANUAL
+  AUTO_DRAFT
+}
+
+enum EntryStatus {
+  DRAFT
+  CONFIRMED
+}
+
+enum ActivityType {
+  COMMIT
+  JOURNAL_ENTRY
+}
+
+enum DriftStatus {
+  WATCHING
+  DRIFTED
+  SUPPRESSED
+}
+
+enum DeliveryStatus {
+  SENT
+  FAILED
+}
+
+enum ContentSource {
+  PHASE
+  FULL_PROJECT
+  OBSTACLE
+}
+
+enum ContentFormat {
+  TWITTER_POST
+  README
+  BUILD_STORY
+  OBSTACLE_POST
+}
+
+enum DraftStatus {
+  DRAFT
+  EDITED
+  EXPORTED
+}
+
+enum PlanType {
+  FREE
+  PRO
+}
+
+// ─────────────────────────────────────────────
+// CORE MODELS
+// ─────────────────────────────────────────────
+
+model Project {
+  id          String        @id @default(uuid())
+  ownerId     String
+  name        String
+  description String?
+  targetDate  DateTime?
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+
+  repo            Repo?
+  phases          Phase[]
+  journalEntries  JournalEntry[]
+  activityLog     ActivityLog?
+  driftMonitor    DriftMonitor?
+  contentRequests ContentRequest[]
+}
+
+model Repo {
+  id            String   @id @default(uuid())
+  projectId     String   @unique
+  githubRepoUrl String
+  webhookId     String
+  connectedAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model Phase {
+  id        String      @id @default(uuid())
+  projectId String
+  type      PhaseType
+  status    PhaseStatus @default(LOCKED)
+  position  Int
+
+  project    Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestones Milestone[]
+}
+
+model Milestone {
+  id       String     @id @default(uuid())
+  phaseId  String
+  title    String
+  status   ItemStatus @default(TODO)
+  source   ItemSource @default(AI)
+  position Int
+
+  phase          Phase          @relation(fields: [phaseId], references: [id], onDelete: Cascade)
+  tasks          Task[]
+  journalEntries JournalEntry[]
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  milestoneId String
+  title       String
+  status      ItemStatus @default(TODO)
+  source      ItemSource @default(AI)
+  position    Int
+
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+}
+
+// content Json shape by EntryType:
+//   OBSTACLE  → { problem: string, root_cause: string, solution: string }
+//   WIN       → { description: string }
+//   DECISION  → { description: string, rationale: string }
+model JournalEntry {
+  id          String      @id @default(uuid())
+  projectId   String
+  phaseId     String?
+  milestoneId String?
+  type        EntryType
+  source      EntrySource @default(MANUAL)
+  status      EntryStatus @default(CONFIRMED)
+  content     Json
+  createdAt   DateTime    @default(now())
+
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  milestone Milestone? @relation(fields: [milestoneId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// ACTIVITY TRACKING
+// ─────────────────────────────────────────────
+
+model ActivityLog {
+  id               String       @id @default(uuid())
+  projectId        String       @unique
+  lastActivityAt   DateTime
+  lastActivityType ActivityType
+
+  project Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  events  ActivityEvent[]
+}
+
+model ActivityEvent {
+  id            String       @id @default(uuid())
+  activityLogId String
+  type          ActivityType
+  occurredAt    DateTime
+  metadata      String? // commit SHA or journalEntryId
+
+  activityLog ActivityLog @relation(fields: [activityLogId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// DRIFT DETECTION
+// ─────────────────────────────────────────────
+
+model DriftMonitor {
+  id             String      @id @default(uuid())
+  projectId      String      @unique
+  thresholdHours Int         @default(24)
+  status         DriftStatus @default(WATCHING)
+  lastCheckedAt  DateTime?
+
+  project       Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  notifications DriftNotification[]
+}
+
+model DriftNotification {
+  id             String         @id @default(uuid())
+  driftMonitorId String
+  sentAt         DateTime
+  lastActivityAt DateTime
+  currentPhase   PhaseType
+  deliveryStatus DeliveryStatus @default(SENT)
+
+  driftMonitor DriftMonitor @relation(fields: [driftMonitorId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// CONTENT GENERATION
+// ─────────────────────────────────────────────
+
+model ContentRequest {
+  id          String          @id @default(uuid())
+  projectId   String
+  source      ContentSource
+  sourceId    String
+  formats     ContentFormat[]
+  requestedAt DateTime        @default(now())
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  drafts  ContentDraft[]
+}
+
+model ContentDraft {
+  id               String        @id @default(uuid())
+  contentRequestId String
+  format           ContentFormat
+  body             String
+  editedBody       String?
+  status           DraftStatus   @default(DRAFT)
+
+  contentRequest ContentRequest @relation(fields: [contentRequestId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────
+// STRIPE / BILLING
+// ─────────────────────────────────────────────
+
+model Subscription {
+  id               String    @id @default(uuid())
+  ownerId          String    @unique
+  stripeCustomerId String    @unique
+  stripeSubId      String    @unique
+  plan             PlanType  @default(FREE)
+  status           String    // active | trialing | past_due | canceled
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+// Idempotency table — prevents duplicate Stripe webhook processing (INV-07)
+model StripeEvent {
+  id        String   @id // Stripe event ID
+  createdAt DateTime @default(now())
+}
