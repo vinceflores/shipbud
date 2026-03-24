@@ -11,12 +11,17 @@ export async function POST(_req: Request) {
     }
     const body = await _req.json()
     const project = await prisma.project.create({
-      data: body,
+      data: {
+        
+        ...body,
+        owner_id: session.user.sub
+      },
     })
 
     return Response.json(project, { status: 201 })
-  } catch {
-    return Response.json({ error: 'Invalid project payload' }, { status: 400 })
+  } catch (error) {
+    console.log(error)
+    return Response.json({ error: 'Bad Request' }, { status: 400 })
   }
 }
 
