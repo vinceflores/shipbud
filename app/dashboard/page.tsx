@@ -60,7 +60,7 @@ export default function DashboardPage() {
             )
           )
         }
-        <Button className="border-2 border-dashed border-gray-800 h-[100px] aspect-video w-[200px]" variant={"ghost"} > <Plus /> New Project </Button>
+        <Button onClick={() => router.push("/projects/new")} className="border-2 border-dashed border-gray-800 h-[100px] aspect-video w-[200px]" variant={"ghost"} > <Plus /> New Project </Button>
       </div>
 
     </main>
