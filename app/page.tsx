@@ -41,7 +41,7 @@ export default function Home() {
 
             {!isLoading && (
               <div className="flex items-center justify-center gap-2">
-                {user ? (
+                {!user ? (
                   <LoginButton />
                 ) : (
                   <Button asChild>

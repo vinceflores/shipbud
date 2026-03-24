@@ -45,7 +45,7 @@ CREATE TYPE "PlanType" AS ENUM ('FREE', 'PRO');
 
 -- CreateTable
 CREATE TABLE "Project" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
     "ownerId" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "description" TEXT,
@@ -58,8 +58,8 @@ CREATE TABLE "Project" (
 
 -- CreateTable
 CREATE TABLE "Repo" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
     "githubRepoUrl" TEXT NOT NULL,
     "webhookId" TEXT NOT NULL,
     "connectedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -69,8 +69,8 @@ CREATE TABLE "Repo" (
 
 -- CreateTable
 CREATE TABLE "Phase" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
     "type" "PhaseType" NOT NULL,
     "status" "PhaseStatus" NOT NULL DEFAULT 'LOCKED',
     "position" INTEGER NOT NULL,
@@ -80,8 +80,8 @@ CREATE TABLE "Phase" (
 
 -- CreateTable
 CREATE TABLE "Milestone" (
-    "id" TEXT NOT NULL,
-    "phaseId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "phaseId" UUID NOT NULL,
     "title" TEXT NOT NULL,
     "status" "ItemStatus" NOT NULL DEFAULT 'TODO',
     "source" "ItemSource" NOT NULL DEFAULT 'AI',
@@ -92,8 +92,8 @@ CREATE TABLE "Milestone" (
 
 -- CreateTable
 CREATE TABLE "Task" (
-    "id" TEXT NOT NULL,
-    "milestoneId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "milestoneId" UUID NOT NULL,
     "title" TEXT NOT NULL,
     "status" "ItemStatus" NOT NULL DEFAULT 'TODO',
     "source" "ItemSource" NOT NULL DEFAULT 'AI',
@@ -104,10 +104,10 @@ CREATE TABLE "Task" (
 
 -- CreateTable
 CREATE TABLE "JournalEntry" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
     "phaseId" TEXT,
-    "milestoneId" TEXT,
+    "milestoneId" UUID,
     "type" "EntryType" NOT NULL,
     "source" "EntrySource" NOT NULL DEFAULT 'MANUAL',
     "status" "EntryStatus" NOT NULL DEFAULT 'CONFIRMED',
@@ -119,8 +119,8 @@ CREATE TABLE "JournalEntry" (
 
 -- CreateTable
 CREATE TABLE "ActivityLog" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
     "lastActivityAt" TIMESTAMP(3) NOT NULL,
     "lastActivityType" "ActivityType" NOT NULL,
 
@@ -129,8 +129,8 @@ CREATE TABLE "ActivityLog" (
 
 -- CreateTable
 CREATE TABLE "ActivityEvent" (
-    "id" TEXT NOT NULL,
-    "activityLogId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "activityLogId" UUID NOT NULL,
     "type" "ActivityType" NOT NULL,
     "occurredAt" TIMESTAMP(3) NOT NULL,
     "metadata" TEXT,
@@ -140,8 +140,8 @@ CREATE TABLE "ActivityEvent" (
 
 -- CreateTable
 CREATE TABLE "DriftMonitor" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
     "thresholdHours" INTEGER NOT NULL DEFAULT 24,
     "status" "DriftStatus" NOT NULL DEFAULT 'WATCHING',
     "lastCheckedAt" TIMESTAMP(3),
@@ -152,7 +152,7 @@ CREATE TABLE "DriftMonitor" (
 -- CreateTable
 CREATE TABLE "DriftNotification" (
     "id" TEXT NOT NULL,
-    "driftMonitorId" TEXT NOT NULL,
+    "driftMonitorId" UUID NOT NULL,
     "sentAt" TIMESTAMP(3) NOT NULL,
     "lastActivityAt" TIMESTAMP(3) NOT NULL,
     "currentPhase" "PhaseType" NOT NULL,
@@ -163,8 +163,8 @@ CREATE TABLE "DriftNotification" (
 
 -- CreateTable
 CREATE TABLE "ContentRequest" (
-    "id" TEXT NOT NULL,
-    "projectId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "projectId" UUID NOT NULL,
     "source" "ContentSource" NOT NULL,
     "sourceId" TEXT NOT NULL,
     "formats" "ContentFormat"[],
@@ -175,8 +175,8 @@ CREATE TABLE "ContentRequest" (
 
 -- CreateTable
 CREATE TABLE "ContentDraft" (
-    "id" TEXT NOT NULL,
-    "contentRequestId" TEXT NOT NULL,
+    "id" UUID NOT NULL,
+    "contentRequestId" UUID NOT NULL,
     "format" "ContentFormat" NOT NULL,
     "body" TEXT NOT NULL,
     "editedBody" TEXT,
@@ -187,7 +187,7 @@ CREATE TABLE "ContentDraft" (
 
 -- CreateTable
 CREATE TABLE "Subscription" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL,
     "ownerId" TEXT NOT NULL,
     "stripeCustomerId" TEXT NOT NULL,
     "stripeSubId" TEXT NOT NULL,

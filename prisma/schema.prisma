@@ -108,7 +108,7 @@ enum PlanType {
 // ─────────────────────────────────────────────
 
 model Project {
-  id          String        @id @default(uuid())
+  id          String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   ownerId     String
   name        String
   description String?
@@ -125,8 +125,8 @@ model Project {
 }
 
 model Repo {
-  id            String   @id @default(uuid())
-  projectId     String   @unique
+  id            String   @id @default(uuid()) @db.Uuid
+  projectId     String   @unique @db.Uuid
   githubRepoUrl String
   webhookId     String
   connectedAt   DateTime @default(now())
@@ -135,8 +135,8 @@ model Repo {
 }
 
 model Phase {
-  id        String      @id @default(uuid())
-  projectId String
+  id        String      @id @default(uuid()) @db.Uuid
+  projectId String      @db.Uuid
   type      PhaseType
   status    PhaseStatus @default(LOCKED)
   position  Int
@@ -146,8 +146,8 @@ model Phase {
 }
 
 model Milestone {
-  id       String     @id @default(uuid())
-  phaseId  String
+  id       String     @id @default(uuid()) @db.Uuid 
+  phaseId  String     @db.Uuid
   title    String
   status   ItemStatus @default(TODO)
   source   ItemSource @default(AI)
@@ -159,8 +159,8 @@ model Milestone {
 }
 
 model Task {
-  id          String     @id @default(uuid())
-  milestoneId String
+  id          String     @id @default(uuid()) @db.Uuid 
+  milestoneId String     @db.Uuid
   title       String
   status      ItemStatus @default(TODO)
   source      ItemSource @default(AI)
@@ -174,10 +174,10 @@ model Task {
 //   WIN       → { description: string }
 //   DECISION  → { description: string, rationale: string }
 model JournalEntry {
-  id          String      @id @default(uuid())
-  projectId   String
+  id          String      @id @default(uuid()) @db.Uuid 
+  projectId   String      @db.Uuid
   phaseId     String?
-  milestoneId String?
+  milestoneId String?     @db.Uuid
   type        EntryType
   source      EntrySource @default(MANUAL)
   status      EntryStatus @default(CONFIRMED)
@@ -193,8 +193,8 @@ model JournalEntry {
 // ─────────────────────────────────────────────
 
 model ActivityLog {
-  id               String       @id @default(uuid())
-  projectId        String       @unique
+  id               String       @id @default(uuid()) @db.Uuid 
+  projectId        String       @unique @db.Uuid
   lastActivityAt   DateTime
   lastActivityType ActivityType
 
@@ -203,8 +203,8 @@ model ActivityLog {
 }
 
 model ActivityEvent {
-  id            String       @id @default(uuid())
-  activityLogId String
+  id            String       @id @default(uuid()) @db.Uuid 
+  activityLogId String       @db.Uuid
   type          ActivityType
   occurredAt    DateTime
   metadata      String? // commit SHA or journalEntryId
@@ -217,8 +217,8 @@ model ActivityEvent {
 // ─────────────────────────────────────────────
 
 model DriftMonitor {
-  id             String      @id @default(uuid())
-  projectId      String      @unique
+  id             String      @id @default(uuid()) @db.Uuid 
+  projectId      String      @unique @db.Uuid
   thresholdHours Int         @default(24)
   status         DriftStatus @default(WATCHING)
   lastCheckedAt  DateTime?
@@ -229,7 +229,7 @@ model DriftMonitor {
 
 model DriftNotification {
   id             String         @id @default(uuid())
-  driftMonitorId String
+  driftMonitorId String         @db.Uuid
   sentAt         DateTime
   lastActivityAt DateTime
   currentPhase   PhaseType
@@ -243,8 +243,8 @@ model DriftNotification {
 // ─────────────────────────────────────────────
 
 model ContentRequest {
-  id          String          @id @default(uuid())
-  projectId   String
+  id          String          @id @default(uuid()) @db.Uuid 
+  projectId   String          @db.Uuid
   source      ContentSource
   sourceId    String
   formats     ContentFormat[]
@@ -255,8 +255,8 @@ model ContentRequest {
 }
 
 model ContentDraft {
-  id               String        @id @default(uuid())
-  contentRequestId String
+  id               String        @id @default(uuid()) @db.Uuid 
+  contentRequestId String        @db.Uuid
   format           ContentFormat
   body             String
   editedBody       String?
@@ -270,7 +270,7 @@ model ContentDraft {
 // ─────────────────────────────────────────────
 
 model Subscription {
-  id               String    @id @default(uuid())
+  id               String    @id @default(uuid()) @db.Uuid 
   ownerId          String    @unique
   stripeCustomerId String    @unique
   stripeSubId      String    @unique
