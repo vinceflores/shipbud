@@ -10,11 +10,18 @@ export async function POST(_req: Request) {
       return new Response("Unauthorized", {status: 401})
     }
     const body = await _req.json()
+    const { name, description, targetDate } = body as {
+      name: string
+      description?: string | null
+      targetDate?: string | null
+    }
+
     const project = await prisma.project.create({
       data: {
-        
-        ...body,
-        owner_id: session.user.sub
+        name,
+        description: description ?? null,
+        targetDate: targetDate ? new Date(targetDate) : null,
+        ownerId: session.user.sub,
       },
     })
 
