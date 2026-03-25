@@ -16,6 +16,7 @@ import {
 import LogoutButton from "@/components/auth0/LogoutButton";
 import LoginButton from "@/components/auth0/LoginButton";
 import { useUser } from "@auth0/nextjs-auth0";
+import { ModeToggle } from "@/components/themes/toggle-dark-button";
 
 export default function Home() {
   const { user, isLoading } = useUser();
@@ -50,6 +51,7 @@ export default function Home() {
                 )}
               </div>
             )}
+            <ModeToggle />
           </nav>
         </div>
       </header>

@@ -8,6 +8,7 @@ import LogoutButton from "@/components/auth0/LogoutButton";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
 import UserButton from "@/components/auth0/user-button";
+import { ModeToggle } from "@/components/themes/toggle-dark-button";
 
 const routes = [
   { href: "/projects", label: "projects" }
@@ -41,6 +42,7 @@ export default function DashboardPage() {
       <nav>
         <LogoutButton />
         <UserButton user={user} />
+        <ModeToggle />
       </nav>
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <p className="text-slate-400 mt-2">
