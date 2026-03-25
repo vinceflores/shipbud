@@ -1,6 +1,7 @@
 import { Inter } from "next/font/google";
 import type { Metadata } from "next";
 import { Auth0Provider } from "@auth0/nextjs-auth0/client";
+import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
 const inter = Inter({
@@ -21,7 +22,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Auth0Provider>{children}</Auth0Provider>
+        <Auth0Provider>
+          {children}
+          <Toaster richColors closeButton position="top-right" />
+        </Auth0Provider>
       </body>
     </html>
   );

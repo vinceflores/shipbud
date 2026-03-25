@@ -10,6 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { MarkdownEditor } from "@/components/ui/markdown-editor";
 
 
 type CreateProjectResponse = {
@@ -28,7 +29,7 @@ export default function CreateProjectPage() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    
+
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError("Project name is required.");
@@ -91,14 +92,12 @@ export default function CreateProjectPage() {
                 <label htmlFor="description" className="block text-sm font-medium">
                   Description (optional)
                 </label>
-                <textarea
+                <MarkdownEditor
                   id="description"
-                  name="description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={setDescription}
                   placeholder="What are you building?"
                   rows={4}
-                  className="w-full rounded-md border border-white/15 bg-[#0d1224] px-3 py-2 text-sm outline-none focus:border-white/30 focus:ring-2 focus:ring-white/20"
                 />
               </div>
 
