@@ -5,5 +5,9 @@ export default function ProjectPlanPage({
 }: {
   params: { id: string };
 }) {
-  return <SDLCDocumentGenerator />
+  return (
+    <div>
+      <SDLCDocumentGenerator />
+    </div>
+  )
 }
