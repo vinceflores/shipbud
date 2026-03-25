@@ -7,6 +7,7 @@ import { useUser } from "@auth0/nextjs-auth0";
 import LogoutButton from "@/components/auth0/LogoutButton";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useRouter } from "next/navigation";
+import UserButton from "@/components/auth0/user-button";
 
 const routes = [
   { href: "/projects", label: "projects" }
@@ -39,6 +40,7 @@ export default function DashboardPage() {
     <main className="min-h-screen bg-[#060812] text-white px-6 py-12 dark">
       <nav>
         <LogoutButton />
+        <UserButton user={user} />
       </nav>
       <h1 className="text-2xl font-semibold">Dashboard</h1>
       <p className="text-slate-400 mt-2">
