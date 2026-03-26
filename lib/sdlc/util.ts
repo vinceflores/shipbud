@@ -1,6 +1,9 @@
-import { createOpenAI } from '@ai-sdk/openai';
-
-export const feather = createOpenAI({
-  baseURL: process.env.FEATHERLESSAI_BASE_URL,
-  apiKey: process.env.OPENAI_API_KEY
-});
+export const getSessionId = () => {
+  if (typeof window === "undefined") return "";
+  let id = localStorage.getItem("req_session_id");
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem("req_session_id", id);
+  }
+  return id;
+};

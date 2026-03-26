@@ -1,9 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { MarkdownEditor } from '@/components/ui/markdown-editor'
-import { Send, Download } from 'lucide-react'
+import { Send, Download, Save } from 'lucide-react'
+import { RequirementEngineerAgent } from '@/lib/sdlc/agents'
+
+type RequirementAgentResponse = {
+  summary: string
+  assumptions: string[]
+  constraints: string[]
+  functionalRequirements: Array<{
+    id: string
+    name: string
+    description: string
+    priority: number
+    acceptanceCriteria: string[]
+  }>
+  nonFunctionalRequirements: Array<{
+    id: string
+    name: string
+    description: string
+    priority: number
+    acceptanceCriteria: string[]
+  }>
+  outOfScope: string[]
+  openQuestions: Array<{ id: string; question: string; why: string }>
+  nextAssistantMessage: string
+}
 
 type Phase = 'requirements' | 'design' | 'tests'
 type Tab = 'design-doc' | 'rtm' | 'tests' | 'milestones'
@@ -32,10 +56,13 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'milestones', label: 'Milestones & Tasks' },
 ]
 
-export function SDLCDocumentGenerator() {
+export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
   const [activePhase, setActivePhase] = useState<Phase>('requirements')
   const [activeTab, setActiveTab] = useState<Tab>('design-doc')
   const [inputValue, setInputValue] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const [phaseData, setPhaseData] = useState<Record<Phase, PhaseData>>({
     requirements: {
@@ -88,8 +115,242 @@ export function SDLCDocumentGenerator() {
   const currentPhase = phaseData[activePhase]
   const currentTabContent = currentPhase.tabContents[activeTab]
 
-  const handleSendMessage = () => {
+  const persistedState = useMemo(() => {
+    const pickTabs = (tabContents: Record<Tab, string>) => ({
+      'design-doc': tabContents['design-doc'],
+      rtm: tabContents.rtm,
+      tests: tabContents.tests,
+    })
+
+    return {
+      requirements: {
+        messages: phaseData.requirements.messages,
+        tabContents: pickTabs(phaseData.requirements.tabContents),
+      },
+      design: {
+        messages: phaseData.design.messages,
+        tabContents: pickTabs(phaseData.design.tabContents),
+      },
+      tests: {
+        messages: phaseData.tests.messages,
+        tabContents: pickTabs(phaseData.tests.tabContents),
+      },
+    }
+  }, [phaseData])
+
+  // Load persisted state once per project.
+  useEffect(() => {
+    if (!projectId) {
+      setIsLoaded(true)
+      setSaveStatus('error')
+      return
+    }
+    let cancelled = false
+
+    async function load() {
+      try {
+        const res = await fetch(`/api/projects/${projectId}/sdlc`, {
+          method: 'GET',
+          headers: { 'content-type': 'application/json' },
+        })
+
+        if (!res.ok) {
+          setIsLoaded(true)
+          return
+        }
+
+        const json = (await res.json()) as { state: any }
+        if (cancelled) return
+        if (!json?.state) {
+          setIsLoaded(true)
+          return
+        }
+
+        setPhaseData((prev) => {
+          const next = { ...prev }
+
+          for (const phase of ['requirements', 'design', 'tests'] as const) {
+            const savedPhase = json.state?.[phase]
+            if (!savedPhase) continue
+
+            next[phase] = {
+              ...next[phase],
+              messages: Array.isArray(savedPhase.messages)
+                ? savedPhase.messages
+                : next[phase].messages,
+              tabContents: {
+                ...next[phase].tabContents,
+                'design-doc': savedPhase.tabContents?.['design-doc'] ?? next[phase].tabContents['design-doc'],
+                rtm: savedPhase.tabContents?.rtm ?? next[phase].tabContents.rtm,
+                tests: savedPhase.tabContents?.tests ?? next[phase].tabContents.tests,
+              },
+            }
+          }
+
+          return next
+        })
+      } finally {
+        if (!cancelled) setIsLoaded(true)
+      }
+    }
+
+    setIsLoaded(false)
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [projectId])
+
+  // Debounced autosave when persisted parts change.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedRef = useRef<string>('')
+
+  useEffect(() => {
+    if (!isLoaded) return
+    if (!projectId) return
+
+    const payload = JSON.stringify(persistedState)
+    if (payload === lastSavedRef.current) return
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      setSaveStatus('saving')
+      void fetch(`/api/projects/${projectId}/sdlc`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ state: persistedState }),
+      })
+        .then((res) => {
+          if (!res.ok) {
+            setSaveStatus('error')
+            return
+          }
+          lastSavedRef.current = payload
+          setSaveStatus('saved')
+        })
+        .catch(() => setSaveStatus('error'))
+    }, 800)
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    }
+  }, [isLoaded, persistedState, projectId])
+
+  const handleSaveNow = async () => {
+    if (!isLoaded) return
+    if (!projectId) {
+      setSaveStatus('error')
+      return
+    }
+
+    const payload = JSON.stringify(persistedState)
+    setSaveStatus('saving')
+    try {
+      const res = await fetch(`/api/projects/${projectId}/sdlc`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ state: persistedState }),
+      })
+
+      if (!res.ok) {
+        setSaveStatus('error')
+        return
+      }
+
+      lastSavedRef.current = payload
+      setSaveStatus('saved')
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
+  const handleDownload = () => {
+    const content = currentTabContent ?? ''
+    const safePhase = activePhase.replace(/[^a-z0-9-_]/gi, '_')
+    const safeTab = activeTab.replace(/[^a-z0-9-_]/gi, '_')
+    const filename = `${safePhase}-${safeTab}.md`
+
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+
+    try {
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+
+  const buildRequirementsMarkdown = (data: RequirementAgentResponse) => {
+    const lines: string[] = []
+    lines.push('# Requirements')
+    lines.push('')
+    lines.push('## Summary')
+    lines.push(data.summary || '(no summary)')
+    lines.push('')
+
+    if (data.constraints?.length) {
+      lines.push('## Constraints')
+      for (const c of data.constraints) lines.push(`- ${c}`)
+      lines.push('')
+    }
+
+    if (data.assumptions?.length) {
+      lines.push('## Assumptions')
+      for (const a of data.assumptions) lines.push(`- ${a}`)
+      lines.push('')
+    }
+
+    lines.push('## Functional Requirements')
+    if (!data.functionalRequirements?.length) {
+      lines.push('- (none yet)')
+    } else {
+      for (const r of [...data.functionalRequirements].sort((a, b) => a.priority - b.priority)) {
+        lines.push(`- **${r.id} (P${r.priority}) — ${r.name}**: ${r.description}`)
+        if (r.acceptanceCriteria?.length) {
+          for (const ac of r.acceptanceCriteria) lines.push(`  - AC: ${ac}`)
+        }
+      }
+    }
+    lines.push('')
+
+    lines.push('## Non-Functional Requirements')
+    if (!data.nonFunctionalRequirements?.length) {
+      lines.push('- (none yet)')
+    } else {
+      for (const r of [...data.nonFunctionalRequirements].sort((a, b) => a.priority - b.priority)) {
+        lines.push(`- **${r.id} (P${r.priority}) — ${r.name}**: ${r.description}`)
+        if (r.acceptanceCriteria?.length) {
+          for (const ac of r.acceptanceCriteria) lines.push(`  - AC: ${ac}`)
+        }
+      }
+    }
+    lines.push('')
+
+    if (data.outOfScope?.length) {
+      lines.push('## Out of Scope')
+      for (const o of data.outOfScope) lines.push(`- ${o}`)
+      lines.push('')
+    }
+
+    if (data.openQuestions?.length) {
+      lines.push('## Open Questions')
+      for (const q of data.openQuestions) lines.push(`- **${q.id}**: ${q.question} _(why: ${q.why})_`)
+      lines.push('')
+    }
+
+    return lines.join('\n')
+  }
+
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return
+    if (isSending) return
 
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -107,8 +368,7 @@ export function SDLCDocumentGenerator() {
 
     setInputValue('')
 
-    // Simulate agent response
-    setTimeout(() => {
+    if (activePhase !== 'requirements') {
       const agentResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -122,7 +382,53 @@ export function SDLCDocumentGenerator() {
           messages: [...prev[activePhase].messages, agentResponse],
         },
       }))
-    }, 500)
+      return
+    }
+
+    setIsSending(true)
+    try {
+      const data = (await RequirementEngineerAgent({
+        messages: [...currentPhase.messages, newMessage].map((m) => ({
+          role: m.role,
+          content: m.content,
+        })),
+      })) as RequirementAgentResponse
+
+      const agentResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.nextAssistantMessage || 'What would you like to build?',
+      }
+
+      setPhaseData((prev) => ({
+        ...prev,
+        requirements: {
+          ...prev.requirements,
+          messages: [...prev.requirements.messages, agentResponse],
+          tabContents: {
+            ...prev.requirements.tabContents,
+            'design-doc': buildRequirementsMarkdown(data),
+          },
+        },
+      }))
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : 'Unknown error'
+      const agentResponse: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `Sorry — I couldn't reach the requirements agent. ${errMsg}`,
+      }
+
+      setPhaseData((prev) => ({
+        ...prev,
+        requirements: {
+          ...prev.requirements,
+          messages: [...prev.requirements.messages, agentResponse],
+        },
+      }))
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleTabContentChange = (newContent: string) => {
@@ -158,14 +464,14 @@ export function SDLCDocumentGenerator() {
               <button
                 onClick={() => setActivePhase(phase.id)}
                 className={`flex flex-col items-center gap-2 flex-1 transition-all ${activePhase === phase.id
-                    ? 'opacity-100'
-                    : 'opacity-50 hover:opacity-75'
+                  ? 'opacity-100'
+                  : 'opacity-50 hover:opacity-75'
                   }`}
               >
                 <div
                   className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${activePhase === phase.id
-                      ? 'bg-blue-500 border-blue-500'
-                      : 'border-white/30 hover:border-white/50'
+                    ? 'bg-blue-500 border-blue-500'
+                    : 'border-white/30 hover:border-white/50'
                     }`}
                 >
                   {activePhase === phase.id && (
@@ -174,8 +480,8 @@ export function SDLCDocumentGenerator() {
                 </div>
                 <span
                   className={`text-xs font-medium transition-all ${activePhase === phase.id
-                      ? 'text-white'
-                      : 'text-white/60'
+                    ? 'text-white'
+                    : 'text-white/60'
                     }`}
                 >
                   {phase.label}
@@ -204,16 +510,16 @@ export function SDLCDocumentGenerator() {
               >
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${message.role === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-white/10 text-white'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-white/10 text-white'
                     }`}
                 >
                   {message.role === 'user' ? 'U' : 'A'}
                 </div>
                 <div
                   className={`max-w-xs px-4 py-2 rounded-lg text-sm ${message.role === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-white/5 text-white/90 border border-white/10'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white/5 text-white/90 border border-white/10'
                     }`}
                 >
                   <p>{message.content}</p>
@@ -227,6 +533,7 @@ export function SDLCDocumentGenerator() {
             <input
               type="text"
               value={inputValue}
+              disabled={isSending}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) =>
                 e.key === 'Enter' && handleSendMessage()
@@ -236,6 +543,7 @@ export function SDLCDocumentGenerator() {
             />
             <Button
               onClick={handleSendMessage}
+              disabled={isSending}
               size="sm"
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >
@@ -254,8 +562,8 @@ export function SDLCDocumentGenerator() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${activeTab === tab.id
-                      ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                      : 'text-white/60 hover:text-white/80'
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                    : 'text-white/60 hover:text-white/80'
                     }`}
                 >
                   <span>{tab.label}</span>
@@ -263,14 +571,38 @@ export function SDLCDocumentGenerator() {
               ))}
             </div>
 
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-white/20 hover:bg-white/5 shrink-0"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Download
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs text-white/50">
+                {saveStatus === 'saving'
+                  ? 'Saving…'
+                  : saveStatus === 'saved'
+                    ? 'Saved'
+                    : saveStatus === 'error'
+                      ? 'Save failed'
+                      : ''}
+              </span>
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-white/20 hover:bg-white/5"
+                onClick={handleSaveNow}
+                disabled={!isLoaded || saveStatus === 'saving'}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-white/20 hover:bg-white/5"
+                onClick={handleDownload}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </Button>
+            </div>
           </div>
 
           {/* Document editor with built-in write/preview toggle */}
@@ -302,8 +634,8 @@ export function SDLCDocumentGenerator() {
           }}
           disabled={!allPhasesComplete}
           className={`ml-4 ${allPhasesComplete
-              ? 'bg-blue-600 hover:bg-blue-700'
-              : 'bg-white/10 text-white/50 cursor-not-allowed'
+            ? 'bg-blue-600 hover:bg-blue-700'
+            : 'bg-white/10 text-white/50 cursor-not-allowed'
             }`}
         >
           Generate Milestones & Tasks →

@@ -1,13 +1,14 @@
 import { SDLCDocumentGenerator } from '@/components/sdlc-document-generator'
 
-export default function ProjectPlanPage({
+export default async function ProjectPlanPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params
   return (
     <div>
-      <SDLCDocumentGenerator />
+      <SDLCDocumentGenerator projectId={id} />
     </div>
   )
 }
