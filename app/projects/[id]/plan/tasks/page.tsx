@@ -45,6 +45,7 @@ type ProjectApiResponse = {
 }
 
 const ITEM_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const
+type ItemStatus = (typeof ITEM_STATUSES)[number]
 
 export default function TasksPage() {
   const params = useParams()
@@ -56,7 +57,9 @@ export default function TasksPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editStatus, setEditStatus] = useState<'TODO' | 'IN_PROGRESS' | 'DONE'>('TODO')
-  const [newTask, setNewTask] = useState({ title: '', milestoneId: '', status: 'TODO' as const })
+  const [newTask, setNewTask] = useState<{ title: string; milestoneId: string; status: ItemStatus }>(
+    { title: '', milestoneId: '', status: 'TODO' },
+  )
 
   useEffect(() => {
     fetchMilestones()

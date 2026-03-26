@@ -39,6 +39,7 @@ type ProjectApiResponse = {
 }
 
 const ITEM_STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'] as const
+type ItemStatus = (typeof ITEM_STATUSES)[number]
 
 export default function MilestonesPage() {
   const params = useParams()
@@ -50,7 +51,9 @@ export default function MilestonesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editStatus, setEditStatus] = useState<'TODO' | 'IN_PROGRESS' | 'DONE'>('TODO')
-  const [newMilestone, setNewMilestone] = useState({ title: '', phaseId: '', status: 'TODO' as const })
+  const [newMilestone, setNewMilestone] = useState<{ title: string; phaseId: string; status: ItemStatus }>(
+    { title: '', phaseId: '', status: 'TODO' },
+  )
 
   useEffect(() => {
     fetchPhases()
@@ -62,9 +65,10 @@ export default function MilestonesPage() {
       const res = await fetch(`/api/projects/${projectId}`)
       if (!res.ok) throw new Error('Failed to fetch project')
       const project: ProjectApiResponse = await res.json()
-      setPhases(project.phases || [])
-      if (project.phases?.length > 0 && !newMilestone.phaseId) {
-        setNewMilestone(prev => ({ ...prev, phaseId: project.phases![0].id }))
+      const projectPhases = project.phases ?? []
+      setPhases(projectPhases)
+      if (projectPhases.length > 0 && !newMilestone.phaseId) {
+        setNewMilestone((prev) => ({ ...prev, phaseId: projectPhases[0].id }))
       }
     } catch (error) {
       toast.error('Failed to load phases')

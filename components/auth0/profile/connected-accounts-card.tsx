@@ -1,20 +1,20 @@
 'use client';
 
 import { UserPlus, Loader2, ExternalLink, Trash2 } from 'lucide-react';
-import { ConnectedAccount, deleteConnectedAccount } from '@/lib/actions/profile';
+import { ConnectedAccount } from '@/lib/actions/profile';
 import { format } from 'date-fns';
 import { useState } from 'react';
 
 interface ConnectedAccountsCardProps {
   connectedAccounts: ConnectedAccount[];
   loading: boolean;
-  onAccountDeleted?: () => void;
+  onDeleteAccount: (accountId: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export default function ConnectedAccountsCard({
   connectedAccounts,
   loading,
-  onAccountDeleted,
+  onDeleteAccount,
 }: ConnectedAccountsCardProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -25,10 +25,9 @@ export default function ConnectedAccountsCard({
 
     setDeletingId(accountId);
     try {
-      const result = await deleteConnectedAccount(accountId);
+      const result = await onDeleteAccount(accountId);
       if (result.success) {
-        // Refresh the list
-        onAccountDeleted?.();
+        // parent refreshes list
       } else {
         alert(`Failed to delete account: ${result.error}`);
       }

@@ -3,6 +3,16 @@ export const runtime = 'nodejs';
 
 import { stripe } from '@/lib/stripe';
 import  prisma  from '@/lib/prisma';
+import type Stripe from 'stripe';
+
+function getSubscriptionCurrentPeriodEndSeconds(subscription: Stripe.Subscription): number | null {
+  const periodEnds = subscription.items.data
+    .map((item) => item.current_period_end)
+    .filter((value): value is number => typeof value === 'number');
+
+  if (periodEnds.length === 0) return null;
+  return Math.max(...periodEnds);
+}
 
 export async function POST(req: Request) {
   const rawBody = await req.text();
@@ -24,7 +34,8 @@ export async function POST(req: Request) {
     case 'checkout.session.completed': {
       const s = event.data.object;
       const stripeSubId = s.subscription as string;
-      const stripeSub = await stripe.subscriptions.retrieve(stripeSubId);
+      const stripeSub = (await stripe.subscriptions.retrieve(stripeSubId)) as Stripe.Subscription;
+      const currentPeriodEndSeconds = getSubscriptionCurrentPeriodEndSeconds(stripeSub);
       await prisma.subscription.create({
         data: {
           ownerId: s.client_reference_id!,
@@ -33,24 +44,25 @@ export async function POST(req: Request) {
           plan: 'PRO',
           status: 'trialing',
           trialEndsAt: stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000) : null,
-          currentPeriodEnd: new Date(stripeSub.current_period_end * 1000),
+          currentPeriodEnd: currentPeriodEndSeconds ? new Date(currentPeriodEndSeconds * 1000) : new Date(),
         },
       });
       break;
     }
     case 'customer.subscription.updated': {
-      const s = event.data.object;
+      const s = event.data.object as Stripe.Subscription;
+      const currentPeriodEndSeconds = getSubscriptionCurrentPeriodEndSeconds(s);
       await prisma.subscription.update({
         where: { stripeSubId: s.id },
         data: {
           status: s.status,
-          currentPeriodEnd: new Date(s.current_period_end * 1000),
+          ...(currentPeriodEndSeconds ? { currentPeriodEnd: new Date(currentPeriodEndSeconds * 1000) } : {}),
         },
       });
       break;
     }
     case 'customer.subscription.deleted': {
-      const s = event.data.object;
+      const s = event.data.object as Stripe.Subscription;
       await prisma.subscription.update({
         where: { stripeSubId: s.id },
         data: { plan: 'FREE', status: 'canceled' },
