@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { MarkdownEditor } from '@/components/ui/markdown-editor'
 import { Send, Download, Save } from 'lucide-react'
-import { RequirementEngineerAgent } from '@/lib/sdlc/agents'
+import { parseFunctionalRequirementsFromMarkdown } from '@/lib/sdlc/util'
 
 type RequirementAgentResponse = {
   summary: string
@@ -29,8 +29,77 @@ type RequirementAgentResponse = {
   nextAssistantMessage: string
 }
 
+type DesignAgentResponse = {
+  summary: string
+  goals: string[]
+  nonGoals: string[]
+  assumptions: string[]
+  constraints: string[]
+  architecture: {
+    overview: string
+    components: Array<{
+      name: string
+      responsibilities: string[]
+      technology?: string
+    }>
+    keyFlows: Array<{ name: string; steps: string[] }>
+  }
+  dataModel: {
+    entities: Array<{
+      name: string
+      description: string
+      fields: string[]
+      relationships: string[]
+    }>
+    storageNotes: string[]
+  }
+  apiDesign: {
+    endpoints: Array<{
+      method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+      path: string
+      description: string
+      request?: string
+      response?: string
+      authz?: string
+    }>
+    events: Array<{
+      name: string
+      payload?: string
+      producers?: string[]
+      consumers?: string[]
+    }>
+  }
+  tradeoffs: Array<{
+    decision: string
+    options: string[]
+    chosen: string
+    rationale: string
+    risks: string[]
+    mitigations: string[]
+  }>
+  openQuestions: Array<{ id: string; question: string; why: string }>
+  nextAssistantMessage: string
+}
+
+type TestsAgentResponse = {
+  summary: string
+  testSuites: Array<{
+    id: string
+    frId: string
+    name: string
+    testCases: Array<{
+      id: string
+      description: string
+      expected: string | number | boolean
+      actual: string
+    }>
+  }>
+  openQuestions: Array<{ id: string; question: string }>
+  nextAssistantMessage: string
+}
+
 type Phase = 'requirements' | 'design' | 'tests'
-type Tab = 'design-doc' | 'rtm' | 'tests' | 'milestones'
+type Tab = 'design-doc' | 'rtm' | 'tests'
 
 interface Message {
   id: string
@@ -43,6 +112,12 @@ interface PhaseData {
   tabContents: Record<Tab, string>
 }
 
+type PersistedSdlcState = {
+  requirements?: { messages?: Message[]; tabContents?: Partial<Record<Tab, string>> & Record<string, unknown> }
+  design?: { messages?: Message[]; tabContents?: Partial<Record<Tab, string>> & Record<string, unknown> }
+  tests?: { messages?: Message[]; tabContents?: Partial<Record<Tab, string>> & Record<string, unknown> }
+}
+
 const PHASES: Array<{ id: Phase; label: string }> = [
   { id: 'requirements', label: 'Requirements' },
   { id: 'design', label: 'Design' },
@@ -53,7 +128,6 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'design-doc', label: 'Design Doc' },
   { id: 'rtm', label: 'RTM' },
   { id: 'tests', label: 'Tests' },
-  { id: 'milestones', label: 'Milestones & Tasks' },
 ]
 
 export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
@@ -77,7 +151,6 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
         'design-doc': '# Design Document\n\nRequirements gathered from the project...',
         'rtm': '# Requirements Traceability Matrix\n\nMapping requirements to design elements...',
         'tests': '# Test Requirements\n\nTest scenarios based on requirements...',
-        'milestones': '# Milestones & Tasks\n\nProject milestones and tasks...',
       },
     },
     design: {
@@ -92,7 +165,6 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
         'design-doc': '# Design Document\n\nArchitecture and design specifications...',
         'rtm': '# Requirements Traceability Matrix\n\nDesign elements mapped to requirements...',
         'tests': '# Design Test Cases\n\nUnit and integration test cases...',
-        'milestones': '# Milestones & Tasks\n\nDesign phase milestones and tasks...',
       },
     },
     tests: {
@@ -107,13 +179,20 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
         'design-doc': '# Test Strategy Document\n\nOverall testing approach...',
         'rtm': '# Requirements Traceability Matrix\n\nTest cases mapped to requirements...',
         'tests': '# Test Cases\n\nDetailed test cases and scenarios...',
-        'milestones': '# Milestones & Tasks\n\nTest execution milestones and tasks...',
       },
     },
   })
 
   const currentPhase = phaseData[activePhase]
-  const currentTabContent = currentPhase.tabContents[activeTab]
+  const currentTabContent =
+    activePhase === 'tests' && activeTab === 'design-doc'
+      ? phaseData.design.tabContents['design-doc']
+      : currentPhase.tabContents[activeTab]
+
+  const switchPhase = (phase: Phase) => {
+    setActivePhase(phase)
+    setActiveTab('design-doc')
+  }
 
   const persistedState = useMemo(() => {
     const pickTabs = (tabContents: Record<Tab, string>) => ({
@@ -159,7 +238,7 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
           return
         }
 
-        const json = (await res.json()) as { state: any }
+        const json = (await res.json()) as { state: PersistedSdlcState | null }
         if (cancelled) return
         if (!json?.state) {
           setIsLoaded(true)
@@ -348,6 +427,148 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
     return lines.join('\n')
   }
 
+  const buildDesignMarkdown = (data: DesignAgentResponse, requirementsMarkdown?: string) => {
+    const lines: string[] = []
+    lines.push('# Design')
+    lines.push('')
+    lines.push('## Summary')
+    lines.push(data.summary || '(no summary)')
+    lines.push('')
+
+    if (requirementsMarkdown?.trim()) {
+      lines.push('## Requirements Snapshot')
+      lines.push(requirementsMarkdown.trim())
+      lines.push('')
+    }
+
+    if (data.goals?.length) {
+      lines.push('## Goals')
+      for (const g of data.goals) lines.push(`- ${g}`)
+      lines.push('')
+    }
+
+    if (data.nonGoals?.length) {
+      lines.push('## Non-Goals')
+      for (const ng of data.nonGoals) lines.push(`- ${ng}`)
+      lines.push('')
+    }
+
+    if (data.constraints?.length) {
+      lines.push('## Constraints')
+      for (const c of data.constraints) lines.push(`- ${c}`)
+      lines.push('')
+    }
+
+    if (data.assumptions?.length) {
+      lines.push('## Assumptions')
+      for (const a of data.assumptions) lines.push(`- ${a}`)
+      lines.push('')
+    }
+
+    lines.push('## Architecture')
+    lines.push(data.architecture?.overview || '(no overview)')
+    lines.push('')
+
+    if (data.architecture?.components?.length) {
+      lines.push('### Components')
+      for (const c of data.architecture.components) {
+        lines.push(`- **${c.name}**${c.technology ? ` (${c.technology})` : ''}`)
+        for (const r of c.responsibilities ?? []) lines.push(`  - ${r}`)
+      }
+      lines.push('')
+    }
+
+    if (data.architecture?.keyFlows?.length) {
+      lines.push('### Key Flows')
+      for (const f of data.architecture.keyFlows) {
+        lines.push(`- **${f.name}**`)
+        for (const s of f.steps ?? []) lines.push(`  - ${s}`)
+      }
+      lines.push('')
+    }
+
+    lines.push('## Data Model')
+    if (!data.dataModel?.entities?.length) {
+      lines.push('- (none yet)')
+      lines.push('')
+    } else {
+      for (const e of data.dataModel.entities) {
+        lines.push(`### ${e.name}`)
+        lines.push(e.description || '')
+        lines.push('')
+        if (e.fields?.length) {
+          lines.push('**Fields**')
+          for (const f of e.fields) lines.push(`- ${f}`)
+          lines.push('')
+        }
+        if (e.relationships?.length) {
+          lines.push('**Relationships**')
+          for (const rel of e.relationships) lines.push(`- ${rel}`)
+          lines.push('')
+        }
+      }
+    }
+
+    if (data.dataModel?.storageNotes?.length) {
+      lines.push('### Storage Notes')
+      for (const n of data.dataModel.storageNotes) lines.push(`- ${n}`)
+      lines.push('')
+    }
+
+    lines.push('## API Design')
+    if (data.apiDesign?.endpoints?.length) {
+      lines.push('### Endpoints')
+      for (const ep of data.apiDesign.endpoints) {
+        lines.push(`- **${ep.method} ${ep.path}** — ${ep.description}`)
+        if (ep.authz) lines.push(`  - Auth: ${ep.authz}`)
+        if (ep.request) lines.push(`  - Req: ${ep.request}`)
+        if (ep.response) lines.push(`  - Res: ${ep.response}`)
+      }
+      lines.push('')
+    } else {
+      lines.push('- (none yet)')
+      lines.push('')
+    }
+
+    if (data.apiDesign?.events?.length) {
+      lines.push('### Events')
+      for (const ev of data.apiDesign.events) {
+        lines.push(`- **${ev.name}**`)
+        if (ev.payload) lines.push(`  - Payload: ${ev.payload}`)
+        if (ev.producers?.length) lines.push(`  - Producers: ${ev.producers.join(', ')}`)
+        if (ev.consumers?.length) lines.push(`  - Consumers: ${ev.consumers.join(', ')}`)
+      }
+      lines.push('')
+    }
+
+    if (data.tradeoffs?.length) {
+      lines.push('## Tradeoffs')
+      for (const t of data.tradeoffs) {
+        lines.push(`### ${t.decision}`)
+        lines.push(`- Chosen: ${t.chosen}`)
+        if (t.options?.length) lines.push(`- Options: ${t.options.join(' | ')}`)
+        if (t.rationale) lines.push(`- Rationale: ${t.rationale}`)
+        if (t.risks?.length) {
+          lines.push('- Risks:')
+          for (const r of t.risks) lines.push(`  - ${r}`)
+        }
+        if (t.mitigations?.length) {
+          lines.push('- Mitigations:')
+          for (const m of t.mitigations) lines.push(`  - ${m}`)
+        }
+        lines.push('')
+      }
+    }
+
+    if (data.openQuestions?.length) {
+      lines.push('## Open Questions')
+      for (const q of data.openQuestions) lines.push(`- **${q.id}**: ${q.question} _(why: ${q.why})_`)
+      lines.push('')
+    }
+
+    return lines.join('\n')
+  }
+
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return
     if (isSending) return
@@ -368,11 +589,182 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
 
     setInputValue('')
 
-    if (activePhase !== 'requirements') {
+    setIsSending(true)
+    try {
+      const messages = [...currentPhase.messages, newMessage].map((m) => ({
+        role: m.role,
+        content: m.content,
+      }))
+
+      // Use the latest known requirements snapshot (avoid stale closure).
+      const requirementsMarkdown = phaseData.requirements.tabContents['design-doc']
+
+      const functionalRequirements =
+        activePhase === 'tests'
+          ? parseFunctionalRequirementsFromMarkdown(requirementsMarkdown)
+          : undefined
+
+      const res = await fetch('/api/agents/projects', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          phase: activePhase,
+          messages,
+          requirementsMarkdown: activePhase === 'design' ? requirementsMarkdown : undefined,
+          functionalRequirements: activePhase === 'tests' ? functionalRequirements : undefined,
+        }),
+      })
+
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as unknown
+        const maybeError =
+          json && typeof json === 'object' && 'error' in json ? (json as { error?: unknown }).error : undefined
+        throw new Error(
+          typeof maybeError === 'string' && maybeError.trim()
+            ? maybeError
+            : `Agent request failed (${res.status})`
+        )
+      }
+
+      if (activePhase === 'requirements') {
+        const data = (await res.json()) as RequirementAgentResponse
+        const agentResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.nextAssistantMessage || 'What would you like to build?',
+        }
+
+        setPhaseData((prev) => ({
+          ...prev,
+          requirements: {
+            ...prev.requirements,
+            messages: [...prev.requirements.messages, agentResponse],
+            tabContents: {
+              ...prev.requirements.tabContents,
+              // Don't clobber user edits; only auto-fill if the doc is still the placeholder/empty.
+              'design-doc':
+                prev.requirements.tabContents['design-doc']?.trim() &&
+                !prev.requirements.tabContents['design-doc'].includes('Requirements gathered from the project')
+                  ? prev.requirements.tabContents['design-doc']
+                  : buildRequirementsMarkdown(data),
+            },
+          },
+        }))
+      } else if (activePhase === 'design') {
+        const data = (await res.json()) as DesignAgentResponse
+        const agentResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.nextAssistantMessage || 'What design decision should we tackle next?',
+        }
+
+        setPhaseData((prev) => ({
+          ...prev,
+          design: {
+            ...prev.design,
+            messages: [...prev.design.messages, agentResponse],
+            tabContents: {
+              ...prev.design.tabContents,
+              'design-doc': buildDesignMarkdown(data, requirementsMarkdown),
+            },
+          },
+        }))
+      } else if (activePhase === 'tests') {
+        const data = (await res.json()) as TestsAgentResponse
+        const agentResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.nextAssistantMessage || 'What should we test next?',
+        }
+
+        const buildTestsMarkdown = (resp: TestsAgentResponse) => {
+          const lines: string[] = []
+          lines.push('# Test Cases')
+          lines.push('')
+          lines.push('## Summary')
+          lines.push(resp.summary || '(no summary)')
+          lines.push('')
+
+          if (!resp.testSuites?.length) {
+            lines.push('- (no test suites yet)')
+            lines.push('')
+          } else {
+            for (const suite of resp.testSuites) {
+              lines.push(`## ${suite.id} — ${suite.name}`)
+              lines.push(`- FR: ${suite.frId}`)
+              lines.push('')
+              for (const tc of suite.testCases ?? []) {
+                lines.push(`- **${tc.id}**: ${tc.description}`)
+                lines.push(`  - Expected: ${String(tc.expected)}`)
+                lines.push(`  - Actual: ${tc.actual || '(TBD)'}`)
+              }
+              lines.push('')
+            }
+          }
+
+          if (resp.openQuestions?.length) {
+            lines.push('## Open Questions')
+            for (const q of resp.openQuestions) lines.push(`- **${q.id}**: ${q.question}`)
+            lines.push('')
+          }
+
+          return lines.join('\n')
+        }
+
+        const buildRtmMarkdown = (resp: TestsAgentResponse) => {
+          const lines: string[] = []
+          lines.push('# Requirements Traceability Matrix')
+          lines.push('')
+          lines.push('| FR | Test Suite | Test Cases | Status |')
+          lines.push('|---|---|---|---|')
+
+          const byFr = new Map<string, { suiteId?: string; caseIds: string[] }>()
+          for (const suite of resp.testSuites ?? []) {
+            const entry = byFr.get(suite.frId) ?? { suiteId: undefined, caseIds: [] }
+            entry.suiteId = suite.id
+            entry.caseIds = (suite.testCases ?? []).map((c) => c.id)
+            byFr.set(suite.frId, entry)
+          }
+
+          const frs = functionalRequirements ?? []
+          if (!frs.length) {
+            lines.push('| (none) |  |  | MISSING |')
+            return lines.join('\n')
+          }
+
+          for (const fr of frs) {
+            const found = byFr.get(fr.id)
+            const suiteId = found?.suiteId ?? ''
+            const caseIds = found?.caseIds?.length ? found.caseIds.join('<br/>') : ''
+            const status = found?.suiteId
+              ? found.caseIds.length
+                ? 'PLANNED'
+                : 'PARTIAL'
+              : 'MISSING'
+            lines.push(`| ${fr.id} | ${suiteId} | ${caseIds} | ${status} |`)
+          }
+
+          return lines.join('\n')
+        }
+
+        setPhaseData((prev) => ({
+          ...prev,
+          tests: {
+            ...prev.tests,
+            messages: [...prev.tests.messages, agentResponse],
+            tabContents: {
+              ...prev.tests.tabContents,
+              rtm: buildRtmMarkdown(data),
+            },
+          },
+        }))
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : 'Unknown error'
       const agentResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: `Processing your request for the ${activePhase} phase...`,
+        content: `Sorry — I couldn't reach the ${activePhase} agent. ${errMsg}`,
       }
 
       setPhaseData((prev) => ({
@@ -382,56 +774,13 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
           messages: [...prev[activePhase].messages, agentResponse],
         },
       }))
-      return
-    }
-
-    setIsSending(true)
-    try {
-      const data = (await RequirementEngineerAgent({
-        messages: [...currentPhase.messages, newMessage].map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-      })) as RequirementAgentResponse
-
-      const agentResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.nextAssistantMessage || 'What would you like to build?',
-      }
-
-      setPhaseData((prev) => ({
-        ...prev,
-        requirements: {
-          ...prev.requirements,
-          messages: [...prev.requirements.messages, agentResponse],
-          tabContents: {
-            ...prev.requirements.tabContents,
-            'design-doc': buildRequirementsMarkdown(data),
-          },
-        },
-      }))
-    } catch (e) {
-      const errMsg = e instanceof Error ? e.message : 'Unknown error'
-      const agentResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `Sorry — I couldn't reach the requirements agent. ${errMsg}`,
-      }
-
-      setPhaseData((prev) => ({
-        ...prev,
-        requirements: {
-          ...prev.requirements,
-          messages: [...prev.requirements.messages, agentResponse],
-        },
-      }))
     } finally {
       setIsSending(false)
     }
   }
 
   const handleTabContentChange = (newContent: string) => {
+    if (activePhase === 'tests' && activeTab === 'design-doc') return
     setPhaseData((prev) => ({
       ...prev,
       [activePhase]: {
@@ -462,7 +811,7 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
           {PHASES.map((phase, index) => (
             <div key={phase.id} className="flex items-center flex-1">
               <button
-                onClick={() => setActivePhase(phase.id)}
+                onClick={() => switchPhase(phase.id)}
                 className={`flex flex-col items-center gap-2 flex-1 transition-all ${activePhase === phase.id
                   ? 'opacity-100'
                   : 'opacity-50 hover:opacity-75'

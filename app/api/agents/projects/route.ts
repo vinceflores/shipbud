@@ -1,10 +1,10 @@
 // // export const runtime = "nodejs";
 
-import { RequirementEngineerAgent } from "@/lib/sdlc/agents";
+import { DesignAgent, RequirementEngineerAgent, TestsAgent } from "@/lib/sdlc/agents";
 import { z } from "zod";
 
 const RequestSchema = z.object({
-  phase: z.enum(["requirements"]).default("requirements"),
+  phase: z.enum(["requirements", "design", "tests"]).default("requirements"),
   messages: z.array(
     z.object({
       role: z.enum(["user", "assistant"]),
@@ -12,6 +12,16 @@ const RequestSchema = z.object({
     })
   ),
   context: z.string().optional(),
+  requirementsMarkdown: z.string().optional(),
+  functionalRequirements: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 export async function GET(_req: Request) {
@@ -31,14 +41,29 @@ export async function POST(req: Request) {
     }
 
     const json = await req.json();
-    const { phase, messages, context } = RequestSchema.parse(json);
+    const { phase, messages, context, requirementsMarkdown, functionalRequirements } =
+      RequestSchema.parse(json);
 
-    if (phase !== "requirements") {
-      return Response.json({ error: "Unsupported phase" }, { status: 400 });
+    if (phase === "requirements") {
+      const result = await RequirementEngineerAgent({ messages, context });
+      return Response.json(result);
     }
 
-    const result = await RequirementEngineerAgent({ messages, context });
-    return Response.json(result);
+    if (phase === "design") {
+      const result = await DesignAgent({ messages, context, requirementsMarkdown });
+      return Response.json(result);
+    }
+
+    if (phase === "tests") {
+      const result = await TestsAgent({
+        messages,
+        projectName: undefined,
+        functionalRequirements: functionalRequirements ?? [],
+      });
+      return Response.json(result);
+    }
+
+    return Response.json({ error: "Unsupported phase" }, { status: 400 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     // If the model/provider fails, it's usually an upstream/server issue.

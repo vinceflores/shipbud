@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,13 @@ export function MarkdownEditor({
     className,
 }: MarkdownEditorProps) {
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
     const [mode, setMode] = useState<"write" | "preview">("write");
+
+    useEffect(() => {
+        setIsMounted(true);
+        setMode("preview");
+    }, []);
 
     const hasContent = useMemo(() => value.trim().length > 0, [value]);
 
@@ -104,7 +110,7 @@ export function MarkdownEditor({
                 </div>
             </div>
 
-            {mode === "write" ? (
+            {(!isMounted || mode === "write") ? (
                 <textarea
                     id={id}
                     ref={textareaRef}
