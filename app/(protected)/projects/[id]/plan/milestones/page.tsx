@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
 
 type Milestone = {
@@ -51,32 +53,31 @@ export default function MilestonesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editStatus, setEditStatus] = useState<'TODO' | 'IN_PROGRESS' | 'DONE'>('TODO')
+  const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false)
   const [newMilestone, setNewMilestone] = useState<{ title: string; phaseId: string; status: ItemStatus }>(
     { title: '', phaseId: '', status: 'TODO' },
   )
 
-  useEffect(() => {
-    fetchPhases()
-    fetchMilestones()
-  }, [projectId])
-
-  const fetchPhases = async () => {
+  const fetchPhases = useCallback(async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}`)
       if (!res.ok) throw new Error('Failed to fetch project')
       const project: ProjectApiResponse = await res.json()
       const projectPhases = project.phases ?? []
       setPhases(projectPhases)
-      if (projectPhases.length > 0 && !newMilestone.phaseId) {
-        setNewMilestone((prev) => ({ ...prev, phaseId: projectPhases[0].id }))
-      }
+      setNewMilestone((prev) => {
+        if (prev.phaseId || projectPhases.length === 0) {
+          return prev
+        }
+        return { ...prev, phaseId: projectPhases[0].id }
+      })
     } catch (error) {
       toast.error('Failed to load phases')
       console.error(error)
     }
-  }
+  }, [projectId])
 
-  const fetchMilestones = async () => {
+  const fetchMilestones = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch(`/api/projects/${projectId}`)
@@ -93,7 +94,12 @@ export default function MilestonesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  useEffect(() => {
+    fetchPhases()
+    fetchMilestones()
+  }, [fetchMilestones, fetchPhases])
 
   const createMilestone = async () => {
     if (phases.length === 0) {
@@ -119,6 +125,7 @@ export default function MilestonesPage() {
 
       toast.success('Milestone created')
       setNewMilestone({ title: '', phaseId: phases[0]?.id || '', status: 'TODO' })
+      setIsCreateSheetOpen(false)
       fetchMilestones()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create milestone')
@@ -208,73 +215,109 @@ export default function MilestonesPage() {
 
   return (
     <div className="w-full space-y-6">
+      <Sheet open={isCreateSheetOpen} onOpenChange={setIsCreateSheetOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto border-white/10 bg-[#0b1022] text-white sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Create New Milestone</SheetTitle>
+            <SheetDescription>
+              Add a milestone and attach it to a phase.
+            </SheetDescription>
+          </SheetHeader>
+
+          {phases.length === 0 ? (
+            <div className="mx-4 rounded-md border border-white/10 bg-white/5 p-4">
+              <p className="text-sm text-slate-300">No phases exist for this project yet.</p>
+              <p className="mt-1 text-sm text-slate-400">
+                Generate a plan first from the Overview tab, then come back to add milestones.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4 px-4 pb-4">
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Milestone Title</label>
+                <input
+                  type="text"
+                  placeholder="Milestone title"
+                  value={newMilestone.title}
+                  onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-400"
+                  onKeyDown={(e) => e.key === 'Enter' && createMilestone()}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Phase</label>
+                <Select value={newMilestone.phaseId} onValueChange={(value) => setNewMilestone({ ...newMilestone, phaseId: value })}>
+                  <SelectTrigger className="w-full border-white/10 bg-white/5 text-white">
+                    <SelectValue placeholder="Select phase" />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#0d1224] text-white">
+                    {phases.map((phase) => (
+                      <SelectItem key={phase.id} value={phase.id}>
+                        {phase.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Status</label>
+                <Select
+                  value={newMilestone.status}
+                  onValueChange={(value) =>
+                    setNewMilestone({
+                      ...newMilestone,
+                      status: value as (typeof ITEM_STATUSES)[number],
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-full border-white/10 bg-white/5 text-white">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#0d1224] text-white">
+                    {ITEM_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" className="border-white/10" onClick={() => setIsCreateSheetOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={createMilestone} className="bg-blue-600 hover:bg-blue-700">
+                  Create
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-white">Milestones</h1>
           <p className="mt-1 text-sm text-slate-400">Manage project milestones</p>
         </div>
-        <Button
-          variant="outline"
-          className="border-white/10"
-          onClick={async () => {
-            await Promise.all([fetchPhases(), fetchMilestones()])
-          }}
-        >
-          Refresh
-        </Button>
-      </div>
-
-      {/* Create New Milestone */}
-      <Card className="border-white/10 bg-white/5 p-6">
-        <h2 className="text-lg font-medium text-white mb-4">Create New Milestone</h2>
-        {phases.length === 0 ? (
-          <div className="rounded-md border border-white/10 bg-white/5 p-4">
-            <p className="text-sm text-slate-300">No phases exist for this project yet.</p>
-            <p className="mt-1 text-sm text-slate-400">
-              Generate a plan first from the Overview tab, then come back to add milestones.
-            </p>
-          </div>
-        ) : null}
-        <div className="flex gap-3 flex-wrap">
-          <input
-            type="text"
-            placeholder="Milestone title"
-            value={newMilestone.title}
-            onChange={(e) => setNewMilestone({ ...newMilestone, title: e.target.value })}
-            disabled={phases.length === 0}
-            className="flex-1 min-w-[200px] rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-400"
-            onKeyDown={(e) => e.key === 'Enter' && createMilestone()}
-          />
-          <select
-            value={newMilestone.phaseId}
-            onChange={(e) => setNewMilestone({ ...newMilestone, phaseId: e.target.value })}
-            disabled={phases.length === 0}
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="border-white/10" onClick={() => setIsCreateSheetOpen(true)}>
+            New Milestone
+          </Button>
+          <Button
+            variant="outline"
+            className="border-white/10"
+            onClick={async () => {
+              await Promise.all([fetchPhases(), fetchMilestones()])
+            }}
           >
-            {phases.map(phase => (
-              <option key={phase.id} value={phase.id}>{phase.title}</option>
-            ))}
-          </select>
-          <select
-            value={newMilestone.status}
-            onChange={(e) =>
-              setNewMilestone({
-                ...newMilestone,
-                status: e.target.value as (typeof ITEM_STATUSES)[number],
-              })
-            }
-            disabled={phases.length === 0}
-            className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
-          >
-            {ITEM_STATUSES.map(status => (
-              <option key={status} value={status}>{status}</option>
-            ))}
-          </select>
-          <Button onClick={createMilestone} disabled={phases.length === 0} className="bg-blue-600 hover:bg-blue-700">
-            Create
+            Refresh
           </Button>
         </div>
-      </Card>
+      </div>
 
       {/* Milestones List */}
       <div className="space-y-3">
@@ -291,7 +334,7 @@ export default function MilestonesPage() {
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="flex-1 min-w-[200px] rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                    className="flex-1 min-w-50 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
                     onKeyDown={(e) => e.key === 'Enter' && updateMilestone(milestone.id)}
                   />
                   <select

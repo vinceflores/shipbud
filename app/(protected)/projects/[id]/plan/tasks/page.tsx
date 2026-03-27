@@ -1,9 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
 
 type Task = {
@@ -57,16 +59,12 @@ export default function TasksPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [editStatus, setEditStatus] = useState<'TODO' | 'IN_PROGRESS' | 'DONE'>('TODO')
+  const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false)
   const [newTask, setNewTask] = useState<{ title: string; milestoneId: string; status: ItemStatus }>(
     { title: '', milestoneId: '', status: 'TODO' },
   )
 
-  useEffect(() => {
-    fetchMilestones()
-    fetchTasks()
-  }, [projectId])
-
-  const fetchMilestones = async () => {
+  const fetchMilestones = useCallback(async () => {
     try {
       const res = await fetch(`/api/projects/${projectId}`)
       if (!res.ok) throw new Error('Failed to fetch project')
@@ -76,16 +74,19 @@ export default function TasksPage() {
           phase.milestones?.map((m) => ({ ...m, phaseId: phase.id })) || [],
         ) || []
       setMilestones(allMilestones)
-      if (allMilestones.length > 0 && !newTask.milestoneId) {
-        setNewTask(prev => ({ ...prev, milestoneId: allMilestones[0].id }))
-      }
+      setNewTask((prev) => {
+        if (prev.milestoneId || allMilestones.length === 0) {
+          return prev
+        }
+        return { ...prev, milestoneId: allMilestones[0].id }
+      })
     } catch (error) {
       toast.error('Failed to load milestones')
       console.error(error)
     }
-  }
+  }, [projectId])
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch(`/api/projects/${projectId}`)
@@ -104,7 +105,12 @@ export default function TasksPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId])
+
+  useEffect(() => {
+    fetchMilestones()
+    fetchTasks()
+  }, [fetchMilestones, fetchTasks])
 
   const createTask = async () => {
     if (!newTask.title.trim() || !newTask.milestoneId) {
@@ -126,6 +132,7 @@ export default function TasksPage() {
 
       toast.success('Task created')
       setNewTask({ title: '', milestoneId: milestones[0]?.id || '', status: 'TODO' })
+      setIsCreateSheetOpen(false)
       fetchTasks()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create task')
@@ -219,66 +226,104 @@ export default function TasksPage() {
 
   return (
     <div className="w-full space-y-6">
+      <Sheet open={isCreateSheetOpen} onOpenChange={setIsCreateSheetOpen}>
+        <SheetContent side="right" className="w-full overflow-y-auto border-white/10 bg-[#0b1022] text-white sm:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>Create New Task</SheetTitle>
+            <SheetDescription>
+              Add a task and link it to a milestone.
+            </SheetDescription>
+          </SheetHeader>
+
+          {milestones.length === 0 ? (
+            <p className="px-4 text-sm text-slate-400">Please create a milestone first before adding tasks.</p>
+          ) : (
+            <div className="space-y-4 px-4 pb-4">
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Task Title</label>
+                <input
+                  type="text"
+                  placeholder="Task title"
+                  value={newTask.title}
+                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-400"
+                  onKeyDown={(e) => e.key === 'Enter' && createTask()}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Milestone</label>
+                <Select value={newTask.milestoneId} onValueChange={(value) => setNewTask({ ...newTask, milestoneId: value })}>
+                  <SelectTrigger className="w-full border-white/10 bg-white/5 text-white">
+                    <SelectValue placeholder="Select milestone" />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#0d1224] text-white">
+                    {milestones.map((milestone) => (
+                      <SelectItem key={milestone.id} value={milestone.id}>
+                        {milestone.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm text-slate-300">Status</label>
+                <Select
+                  value={newTask.status}
+                  onValueChange={(value) =>
+                    setNewTask({
+                      ...newTask,
+                      status: value as (typeof ITEM_STATUSES)[number],
+                    })
+                  }
+                >
+                  <SelectTrigger className="w-full border-white/10 bg-white/5 text-white">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent className="border-white/10 bg-[#0d1224] text-white">
+                    {ITEM_STATUSES.map((status) => (
+                      <SelectItem key={status} value={status}>
+                        {status}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" className="border-white/10" onClick={() => setIsCreateSheetOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={createTask} className="bg-blue-600 hover:bg-blue-700">
+                  Create
+                </Button>
+              </div>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-white">Tasks</h1>
           <p className="mt-1 text-sm text-slate-400">Manage project tasks</p>
         </div>
-        <Button
-          variant="outline"
-          className="border-white/10"
-          onClick={async () => {
-            await Promise.all([fetchMilestones(), fetchTasks()])
-          }}
-        >
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" className="border-white/10" onClick={() => setIsCreateSheetOpen(true)}>
+            New Task
+          </Button>
+          <Button
+            variant="outline"
+            className="border-white/10"
+            onClick={async () => {
+              await Promise.all([fetchMilestones(), fetchTasks()])
+            }}
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
-
-      {/* Create New Task */}
-      <Card className="border-white/10 bg-white/5 p-6">
-        <h2 className="text-lg font-medium text-white mb-4">Create New Task</h2>
-        {milestones.length === 0 ? (
-          <p className="text-sm text-slate-400">Please create a milestone first before adding tasks.</p>
-        ) : (
-          <div className="flex gap-3 flex-wrap">
-            <input
-              type="text"
-              placeholder="Task title"
-              value={newTask.title}
-              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-              className="flex-1 min-w-[200px] rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-400"
-              onKeyDown={(e) => e.key === 'Enter' && createTask()}
-            />
-            <select
-              value={newTask.milestoneId}
-              onChange={(e) => setNewTask({ ...newTask, milestoneId: e.target.value })}
-              className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
-            >
-              {milestones.map(milestone => (
-                <option key={milestone.id} value={milestone.id}>{milestone.title}</option>
-              ))}
-            </select>
-            <select
-              value={newTask.status}
-              onChange={(e) =>
-                setNewTask({
-                  ...newTask,
-                  status: e.target.value as (typeof ITEM_STATUSES)[number],
-                })
-              }
-              className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
-            >
-              {ITEM_STATUSES.map(status => (
-                <option key={status} value={status}>{status}</option>
-              ))}
-            </select>
-            <Button onClick={createTask} className="bg-blue-600 hover:bg-blue-700">
-              Create
-            </Button>
-          </div>
-        )}
-      </Card>
 
       {/* Tasks List */}
       <div className="space-y-3">
@@ -295,7 +340,7 @@ export default function TasksPage() {
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="flex-1 min-w-[200px] rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                    className="flex-1 min-w-50 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
                     onKeyDown={(e) => e.key === 'Enter' && updateTask(task.id)}
                   />
                   <select

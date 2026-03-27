@@ -18,8 +18,8 @@ export function PlanNav({
 
     const navigation = [
         { name: "Overview", href: basePath },
-        { name: "Tasks", href: `${basePath}/tasks` },
         { name: "Milestones", href: `${basePath}/milestones` },
+        { name: "Tasks", href: `${basePath}/tasks` },
     ];
 
     return (

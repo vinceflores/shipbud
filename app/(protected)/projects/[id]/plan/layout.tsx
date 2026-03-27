@@ -16,7 +16,7 @@ export default async function PlanLayout({
             <div>
                 <h2 className="text-2xl font-bold tracking-tight">Plan</h2>
                 <p className="text-muted-foreground">
-                    Manage your project plan, tasks, and milestones.
+                    Manage your project plan, milestones, and tasks.
                 </p>
             </div>
 
