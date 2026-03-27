@@ -137,7 +137,7 @@ export async function POST(req: Request) {
         type,
         source: 'MANUAL',
         status,
-        content: parsedContent as unknown as Record<string, unknown>,
+        content: parsedContent as any,
       },
       include: {
         milestone: {

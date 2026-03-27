@@ -1,0 +1,4 @@
+{
+    "chat.notifyWindowOnConfirmation": "always",
+    "chat.notifyWindowOnResponseReceived": "always"
+}

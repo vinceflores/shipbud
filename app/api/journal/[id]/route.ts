@@ -156,7 +156,7 @@ export async function PATCH(
       where: {
         id: existing.id,
       },
-      data: updateData,
+      data: updateData as any,
       include: {
         milestone: {
           select: {

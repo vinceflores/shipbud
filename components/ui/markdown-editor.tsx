@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,21 @@ export function MarkdownEditor({
     className,
 }: MarkdownEditorProps) {
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const [isMounted, setIsMounted] = useState(false);
-    const [mode, setMode] = useState<"write" | "preview">("write");
+    const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isMounted = useSyncExternalStore(
+        () => () => undefined,
+        () => true,
+        () => false,
+    );
+    const [mode, setMode] = useState<"write" | "preview">("preview");
+    const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
 
     useEffect(() => {
-        setIsMounted(true);
-        setMode("preview");
+        return () => {
+            if (copyResetTimerRef.current) {
+                clearTimeout(copyResetTimerRef.current);
+            }
+        };
     }, []);
 
     const hasContent = useMemo(() => value.trim().length > 0, [value]);
@@ -86,6 +95,23 @@ export function MarkdownEditor({
         });
     }
 
+    async function copyToClipboard() {
+        try {
+            await navigator.clipboard.writeText(value);
+            setCopyState("copied");
+        } catch {
+            setCopyState("error");
+        }
+
+        if (copyResetTimerRef.current) {
+            clearTimeout(copyResetTimerRef.current);
+        }
+
+        copyResetTimerRef.current = setTimeout(() => {
+            setCopyState("idle");
+        }, 1600);
+    }
+
     return (
         <div className={cn("rounded-md border border-white/15 bg-[#0d1224]", className)}>
             <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2">
@@ -107,6 +133,9 @@ export function MarkdownEditor({
                     <Button size="xs" variant="ghost" type="button" onClick={() => insertPrefix("- ")}>List</Button>
                     <Button size="xs" variant="ghost" type="button" onClick={() => insertAround("`", "`")}>Code</Button>
                     <Button size="xs" variant="ghost" type="button" onClick={insertLink}>Link</Button>
+                    <Button size="xs" variant="ghost" type="button" onClick={copyToClipboard}>
+                        {copyState === "copied" ? "Copied" : copyState === "error" ? "Copy failed" : "Copy"}
+                    </Button>
                 </div>
             </div>
 
