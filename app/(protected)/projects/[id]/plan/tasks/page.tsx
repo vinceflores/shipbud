@@ -219,9 +219,20 @@ export default function TasksPage() {
 
   return (
     <div className="w-full space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-white">Tasks</h1>
-        <p className="mt-1 text-sm text-slate-400">Manage project tasks</p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Tasks</h1>
+          <p className="mt-1 text-sm text-slate-400">Manage project tasks</p>
+        </div>
+        <Button
+          variant="outline"
+          className="border-white/10"
+          onClick={async () => {
+            await Promise.all([fetchMilestones(), fetchTasks()])
+          }}
+        >
+          Refresh
+        </Button>
       </div>
 
       {/* Create New Task */}

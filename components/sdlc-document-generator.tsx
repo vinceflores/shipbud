@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { MarkdownEditor } from '@/components/ui/markdown-editor'
 import { Send, Download, Save } from 'lucide-react'
@@ -99,7 +100,7 @@ type TestsAgentResponse = {
 }
 
 type Phase = 'requirements' | 'design' | 'tests'
-type Tab = 'design-doc' | 'rtm' | 'tests'
+type Tab = 'requirements-doc' | 'design-doc' | 'rtm' | 'tests'
 
 interface Message {
   id: string
@@ -125,20 +126,36 @@ const PHASES: Array<{ id: Phase; label: string }> = [
 ]
 
 const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'requirements-doc', label: 'Requirements Doc' },
   { id: 'design-doc', label: 'Design Doc' },
   { id: 'rtm', label: 'RTM' },
   { id: 'tests', label: 'Tests' },
 ]
 
-export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
-  const [activePhase, setActivePhase] = useState<Phase>('requirements')
-  const [activeTab, setActiveTab] = useState<Tab>('design-doc')
-  const [inputValue, setInputValue] = useState('')
-  const [isSending, setIsSending] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+function getPhaseStorageKey(projectId: string) {
+  return `sdlc-active-phase:${projectId}`
+}
 
-  const [phaseData, setPhaseData] = useState<Record<Phase, PhaseData>>({
+function isValidPhase(value: string): value is Phase {
+  return value === 'requirements' || value === 'design' || value === 'tests'
+}
+
+function getInitialPhase(projectId: string): Phase {
+  if (typeof window === 'undefined') return 'requirements'
+
+  const stored = window.localStorage.getItem(getPhaseStorageKey(projectId))
+  return stored && isValidPhase(stored) ? stored : 'requirements'
+}
+
+const TAB_PHASE_PRIORITY: Record<Tab, Phase[]> = {
+  'requirements-doc': ['requirements', 'design', 'tests'],
+  'design-doc': ['design', 'requirements', 'tests'],
+  rtm: ['design', 'tests', 'requirements'],
+  tests: ['tests', 'design', 'requirements'],
+}
+
+function createDefaultPhaseData(): Record<Phase, PhaseData> {
+  return {
     requirements: {
       messages: [
         {
@@ -148,6 +165,7 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
         },
       ],
       tabContents: {
+        'requirements-doc': '# Requirements\n\nBusiness goals, users, and constraints...',
         'design-doc': '# Design Document\n\nRequirements gathered from the project...',
         'rtm': '# Requirements Traceability Matrix\n\nMapping requirements to design elements...',
         'tests': '# Test Requirements\n\nTest scenarios based on requirements...',
@@ -162,6 +180,7 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
         },
       ],
       tabContents: {
+        'requirements-doc': '',
         'design-doc': '# Design Document\n\nArchitecture and design specifications...',
         'rtm': '# Requirements Traceability Matrix\n\nDesign elements mapped to requirements...',
         'tests': '# Design Test Cases\n\nUnit and integration test cases...',
@@ -176,26 +195,78 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
         },
       ],
       tabContents: {
+        'requirements-doc': '',
         'design-doc': '# Test Strategy Document\n\nOverall testing approach...',
         'rtm': '# Requirements Traceability Matrix\n\nTest cases mapped to requirements...',
         'tests': '# Test Cases\n\nDetailed test cases and scenarios...',
       },
     },
+  }
+}
+
+function normalizePersistedState(state: PersistedSdlcState): Record<Phase, PhaseData> {
+  const normalizePhase = (phase: PersistedSdlcState[Phase] | undefined): PhaseData => ({
+    messages: Array.isArray(phase?.messages) ? phase.messages : [],
+    tabContents: {
+      'requirements-doc': typeof phase?.tabContents?.['requirements-doc'] === 'string' ? phase.tabContents['requirements-doc'] : '',
+      'design-doc': typeof phase?.tabContents?.['design-doc'] === 'string' ? phase.tabContents['design-doc'] : '',
+      rtm: typeof phase?.tabContents?.rtm === 'string' ? phase.tabContents.rtm : '',
+      tests: typeof phase?.tabContents?.tests === 'string' ? phase.tabContents.tests : '',
+    },
   })
 
+  return {
+    requirements: normalizePhase(state.requirements),
+    design: normalizePhase(state.design),
+    tests: normalizePhase(state.tests),
+  }
+}
+
+export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
+  const router = useRouter()
+  const [activePhase, setActivePhase] = useState<Phase>('requirements')
+  const [activeTab, setActiveTab] = useState<Tab>('requirements-doc')
+  const [isPhasePreferenceReady, setIsPhasePreferenceReady] = useState(false)
+  const [inputValue, setInputValue] = useState('')
+  const [isSending, setIsSending] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [loadStatus, setLoadStatus] = useState<'idle' | 'loading' | 'loaded' | 'error'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
+  const [phaseData, setPhaseData] = useState<Record<Phase, PhaseData>>(createDefaultPhaseData)
+
   const currentPhase = phaseData[activePhase]
-  const currentTabContent =
-    activePhase === 'tests' && activeTab === 'design-doc'
-      ? phaseData.design.tabContents['design-doc']
-      : currentPhase.tabContents[activeTab]
+  const currentTabContent = (() => {
+    const phases = TAB_PHASE_PRIORITY[activeTab]
+    for (const phase of phases) {
+      const candidate = phaseData[phase].tabContents[activeTab]
+      if (candidate.trim()) return candidate
+    }
+
+    return phaseData[phases[0]].tabContents[activeTab]
+  })()
 
   const switchPhase = (phase: Phase) => {
     setActivePhase(phase)
-    setActiveTab('design-doc')
+    setActiveTab('requirements-doc')
   }
+
+  useEffect(() => {
+    if (!isPhasePreferenceReady) return
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(getPhaseStorageKey(projectId), activePhase)
+  }, [activePhase, projectId, isPhasePreferenceReady])
+
+  useEffect(() => {
+    setIsPhasePreferenceReady(false)
+    setActivePhase(getInitialPhase(projectId))
+    setActiveTab('requirements-doc')
+    setIsPhasePreferenceReady(true)
+  }, [projectId])
 
   const persistedState = useMemo(() => {
     const pickTabs = (tabContents: Record<Tab, string>) => ({
+      'requirements-doc': tabContents['requirements-doc'],
       'design-doc': tabContents['design-doc'],
       rtm: tabContents.rtm,
       tests: tabContents.tests,
@@ -217,77 +288,68 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
     }
   }, [phaseData])
 
-  // Load persisted state once per project.
-  useEffect(() => {
+  // Debounced autosave bookkeeping.
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastSavedRef = useRef<string>('')
+
+  const loadPersistedState = async (signal?: AbortSignal) => {
     if (!projectId) {
       setIsLoaded(true)
+      setLoadStatus('error')
       setSaveStatus('error')
       return
     }
-    let cancelled = false
 
-    async function load() {
-      try {
-        const res = await fetch(`/api/projects/${projectId}/sdlc`, {
-          method: 'GET',
-          headers: { 'content-type': 'application/json' },
-        })
-
-        if (!res.ok) {
-          setIsLoaded(true)
-          return
-        }
-
-        const json = (await res.json()) as { state: PersistedSdlcState | null }
-        if (cancelled) return
-        if (!json?.state) {
-          setIsLoaded(true)
-          return
-        }
-
-        setPhaseData((prev) => {
-          const next = { ...prev }
-
-          for (const phase of ['requirements', 'design', 'tests'] as const) {
-            const savedPhase = json.state?.[phase]
-            if (!savedPhase) continue
-
-            next[phase] = {
-              ...next[phase],
-              messages: Array.isArray(savedPhase.messages)
-                ? savedPhase.messages
-                : next[phase].messages,
-              tabContents: {
-                ...next[phase].tabContents,
-                'design-doc': savedPhase.tabContents?.['design-doc'] ?? next[phase].tabContents['design-doc'],
-                rtm: savedPhase.tabContents?.rtm ?? next[phase].tabContents.rtm,
-                tests: savedPhase.tabContents?.tests ?? next[phase].tabContents.tests,
-              },
-            }
-          }
-
-          return next
-        })
-      } finally {
-        if (!cancelled) setIsLoaded(true)
-      }
-    }
-
+    setPhaseData(createDefaultPhaseData())
+    setLoadStatus('loading')
     setIsLoaded(false)
-    void load()
 
-    return () => {
-      cancelled = true
+    try {
+      const res = await fetch(`/api/projects/${projectId}/sdlc`, {
+        method: 'GET',
+        headers: { 'content-type': 'application/json' },
+        signal,
+      })
+
+      if (!res.ok) {
+        setLoadStatus('error')
+        return
+      }
+
+      const json = (await res.json()) as { state: PersistedSdlcState | null; updatedAt?: string | null }
+
+      if (!json?.state) {
+        lastSavedRef.current = JSON.stringify(persistedState)
+        setSaveStatus('saved')
+        setLoadStatus('loaded')
+        return
+      }
+
+      const normalized = normalizePersistedState(json.state)
+      setPhaseData(normalized)
+      lastSavedRef.current = JSON.stringify(normalized)
+      setSaveStatus('saved')
+
+      setLoadStatus('loaded')
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      setLoadStatus('error')
+    } finally {
+      setIsLoaded(true)
     }
-  }, [projectId])
+  }
 
-  // Debounced autosave when persisted parts change.
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedRef = useRef<string>('')
+  // Load persisted state once per project.
+  useEffect(() => {
+    const controller = new AbortController()
+    void loadPersistedState(controller.signal)
+    return () => controller.abort()
+  }, [projectId])
 
   useEffect(() => {
     if (!isLoaded) return
     if (!projectId) return
+    if (loadStatus !== 'loaded') return
 
     const payload = JSON.stringify(persistedState)
     if (payload === lastSavedRef.current) return
@@ -317,7 +379,7 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     }
-  }, [isLoaded, persistedState, projectId])
+  }, [isLoaded, loadStatus, persistedState, projectId])
 
   const handleSaveNow = async () => {
     if (!isLoaded) return
@@ -597,7 +659,7 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
       }))
 
       // Use the latest known requirements snapshot (avoid stale closure).
-      const requirementsMarkdown = phaseData.requirements.tabContents['design-doc']
+      const requirementsMarkdown = phaseData.requirements.tabContents['requirements-doc']
 
       const functionalRequirements =
         activePhase === 'tests'
@@ -634,22 +696,35 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
           content: data.nextAssistantMessage || 'What would you like to build?',
         }
 
-        setPhaseData((prev) => ({
-          ...prev,
-          requirements: {
-            ...prev.requirements,
-            messages: [...prev.requirements.messages, agentResponse],
-            tabContents: {
-              ...prev.requirements.tabContents,
-              // Don't clobber user edits; only auto-fill if the doc is still the placeholder/empty.
-              'design-doc':
-                prev.requirements.tabContents['design-doc']?.trim() &&
-                !prev.requirements.tabContents['design-doc'].includes('Requirements gathered from the project')
-                  ? prev.requirements.tabContents['design-doc']
-                  : buildRequirementsMarkdown(data),
+        setPhaseData((prev) => {
+          const nextRequirementsDoc = buildRequirementsMarkdown(data)
+
+          return {
+            ...prev,
+            requirements: {
+              ...prev.requirements,
+              messages: [...prev.requirements.messages, agentResponse],
+              tabContents: {
+                ...prev.requirements.tabContents,
+                'requirements-doc': nextRequirementsDoc,
+              },
             },
-          },
-        }))
+            design: {
+              ...prev.design,
+              tabContents: {
+                ...prev.design.tabContents,
+                'requirements-doc': nextRequirementsDoc,
+              },
+            },
+            tests: {
+              ...prev.tests,
+              tabContents: {
+                ...prev.tests.tabContents,
+                'requirements-doc': nextRequirementsDoc,
+              },
+            },
+          }
+        })
       } else if (activePhase === 'design') {
         const data = (await res.json()) as DesignAgentResponse
         const agentResponse: Message = {
@@ -658,17 +733,35 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
           content: data.nextAssistantMessage || 'What design decision should we tackle next?',
         }
 
-        setPhaseData((prev) => ({
-          ...prev,
-          design: {
-            ...prev.design,
-            messages: [...prev.design.messages, agentResponse],
-            tabContents: {
-              ...prev.design.tabContents,
-              'design-doc': buildDesignMarkdown(data, requirementsMarkdown),
+        setPhaseData((prev) => {
+          const nextDesignDoc = buildDesignMarkdown(data, requirementsMarkdown)
+
+          return {
+            ...prev,
+            design: {
+              ...prev.design,
+              messages: [...prev.design.messages, agentResponse],
+              tabContents: {
+                ...prev.design.tabContents,
+                'design-doc': nextDesignDoc,
+              },
             },
-          },
-        }))
+            requirements: {
+              ...prev.requirements,
+              tabContents: {
+                ...prev.requirements.tabContents,
+                'design-doc': nextDesignDoc,
+              },
+            },
+            tests: {
+              ...prev.tests,
+              tabContents: {
+                ...prev.tests.tabContents,
+                'design-doc': nextDesignDoc,
+              },
+            },
+          }
+        })
       } else if (activePhase === 'tests') {
         const data = (await res.json()) as TestsAgentResponse
         const agentResponse: Message = {
@@ -747,17 +840,40 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
           return lines.join('\n')
         }
 
-        setPhaseData((prev) => ({
-          ...prev,
-          tests: {
-            ...prev.tests,
-            messages: [...prev.tests.messages, agentResponse],
-            tabContents: {
-              ...prev.tests.tabContents,
-              rtm: buildRtmMarkdown(data),
+        setPhaseData((prev) => {
+          const nextTestsDoc = buildTestsMarkdown(data)
+
+          const nextRtmDoc = buildRtmMarkdown(data)
+
+          return {
+            ...prev,
+            tests: {
+              ...prev.tests,
+              messages: [...prev.tests.messages, agentResponse],
+              tabContents: {
+                ...prev.tests.tabContents,
+                tests: nextTestsDoc,
+                rtm: nextRtmDoc,
+              },
             },
-          },
-        }))
+            requirements: {
+              ...prev.requirements,
+              tabContents: {
+                ...prev.requirements.tabContents,
+                tests: nextTestsDoc,
+                rtm: nextRtmDoc,
+              },
+            },
+            design: {
+              ...prev.design,
+              tabContents: {
+                ...prev.design.tabContents,
+                tests: nextTestsDoc,
+                rtm: nextRtmDoc,
+              },
+            },
+          }
+        })
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : 'Unknown error'
@@ -780,13 +896,26 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
   }
 
   const handleTabContentChange = (newContent: string) => {
-    if (activePhase === 'tests' && activeTab === 'design-doc') return
     setPhaseData((prev) => ({
       ...prev,
-      [activePhase]: {
-        ...prev[activePhase],
+      requirements: {
+        ...prev.requirements,
         tabContents: {
-          ...prev[activePhase].tabContents,
+          ...prev.requirements.tabContents,
+          [activeTab]: newContent,
+        },
+      },
+      design: {
+        ...prev.design,
+        tabContents: {
+          ...prev.design.tabContents,
+          [activeTab]: newContent,
+        },
+      },
+      tests: {
+        ...prev.tests,
+        tabContents: {
+          ...prev.tests.tabContents,
           [activeTab]: newContent,
         },
       },
@@ -803,6 +932,21 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
       <div>
         <h1 className="text-2xl font-semibold text-white">SDLC Plan</h1>
         <p className="mt-1 text-sm text-slate-400">Define requirements, design, and tests for your project</p>
+        {loadStatus === 'error' ? (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2">
+            <p className="text-sm text-red-200">
+              Couldn’t load saved SDLC docs (temporary DB issue). Showing local defaults.
+            </p>
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-white/10"
+              onClick={() => void loadPersistedState()}
+            >
+              Retry
+            </Button>
+          </div>
+        ) : null}
       </div>
 
       {/* Phase Stepper */}
@@ -976,10 +1120,31 @@ export function SDLCDocumentGenerator({ projectId }: { projectId: string }) {
           </p>
         </div>
         <Button
-          onClick={() => {
-            if (allPhasesComplete) {
-              console.log('Generating milestones and tasks...')
+          onClick={async () => {
+            if (!allPhasesComplete) return
+            if (!projectId) return
+
+            const res = await fetch(`/api/projects/${projectId}/plan`, {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+            })
+
+            if (!res.ok) {
+              const json = (await res.json().catch(() => null)) as unknown
+              const maybeError =
+                json && typeof json === 'object' && json && 'error' in json
+                  ? (json as { error?: unknown }).error
+                  : undefined
+              const message =
+                typeof maybeError === 'string' && maybeError.trim()
+                  ? maybeError
+                  : `Plan generation failed (${res.status})`
+              // eslint-disable-next-line no-alert
+              alert(message)
+              return
             }
+
+            router.push(`/projects/${projectId}/plan/milestones`)
           }}
           disabled={!allPhasesComplete}
           className={`ml-4 ${allPhasesComplete

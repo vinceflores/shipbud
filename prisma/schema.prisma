@@ -123,6 +123,11 @@ model Project {
   driftMonitor    DriftMonitor?
   contentRequests ContentRequest[]
   sdlcState       ProjectSdlcState?
+
+  requirementsDoc ProjectRequirementsDoc?
+  designDoc ProjectDesignDoc?
+  rtmDoc    ProjectRtmDoc?
+  testsDoc  ProjectTestsDoc?
 }
 
 model ProjectSdlcState {
@@ -132,7 +137,65 @@ model ProjectSdlcState {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  requirementsDocId String? @unique @db.Uuid
+  designDocId String? @unique @db.Uuid
+  rtmDocId    String? @unique @db.Uuid
+  testsDocId  String? @unique @db.Uuid
+
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  requirementsDoc ProjectRequirementsDoc? @relation(fields: [requirementsDocId], references: [id], onDelete: SetNull)
+  designDoc ProjectDesignDoc? @relation(fields: [designDocId], references: [id], onDelete: SetNull)
+  rtmDoc    ProjectRtmDoc?    @relation(fields: [rtmDocId], references: [id], onDelete: SetNull)
+  testsDoc  ProjectTestsDoc?  @relation(fields: [testsDocId], references: [id], onDelete: SetNull)
+}
+
+model ProjectRequirementsDoc {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @unique @db.Uuid
+  markdown  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sdlcState ProjectSdlcState?
+}
+
+model ProjectDesignDoc {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @unique @db.Uuid
+  markdown  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sdlcState ProjectSdlcState?
+}
+
+model ProjectRtmDoc {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @unique @db.Uuid
+  markdown  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sdlcState ProjectSdlcState?
+}
+
+model ProjectTestsDoc {
+  id        String   @id @default(uuid()) @db.Uuid
+  projectId String   @unique @db.Uuid
+  markdown  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sdlcState ProjectSdlcState?
 }
 
 model Repo {

@@ -47,7 +47,7 @@ export default function UserButton({
     const resolvedLogoutUrl = logoutUrl;
 
     return (
-        <DropdownMenu>
+        <DropdownMenu >
             <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
@@ -56,7 +56,7 @@ export default function UserButton({
                     </Avatar>
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56" align="end" forceMount>
+            <DropdownMenuContent className="w-auto py-4" align="end" forceMount>
                 <DropdownMenuLabel className="font-normal">
                     <div className="flex gap-3">
                         <Avatar className="h-8 w-8">
@@ -78,14 +78,14 @@ export default function UserButton({
                     </>
                 )}
 
-                <DropdownMenuItem>
+                <DropdownMenuItem className='px-4'>
                     <a href="/profile" className="flex gap-2 items-center">
                         <User />
                         Profile
                     </a>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem>
+                <DropdownMenuItem className='px-4'>
                     <a href={resolvedLogoutUrl} className="flex gap-2 items-center">
                         <LogOut />
                         Log out
