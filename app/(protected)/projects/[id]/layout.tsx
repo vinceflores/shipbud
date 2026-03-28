@@ -12,7 +12,6 @@ const NAVIGATION_ITEMS = [
     { id: 'plan', label: 'Plan', href: '/projects/[id]/plan' },
     { id: 'journal', label: 'Journal', href: '/projects/[id]/journal' },
     { id: 'content', label: 'Content', href: '/projects/[id]/content' },
-    { id: 'github', label: 'GitHub', href: '/projects/[id]/github' },
     { id: 'settings', label: 'Settings', href: '/projects/[id]/settings' },
 ]
 
@@ -26,7 +25,6 @@ export default function ProjectPageLayout({ children }: ProjectPageLayoutProps) 
         if (pathname.includes('/plan')) return 'plan'
         if (pathname.includes('/journal')) return 'journal'
         if (pathname.includes('/content')) return 'content'
-        if (pathname.includes('/github')) return 'github'
         if (pathname.includes('/settings')) return 'settings'
         return 'plan' // default
     }
@@ -48,8 +46,8 @@ export default function ProjectPageLayout({ children }: ProjectPageLayoutProps) 
                                     key={item.id}
                                     href={href}
                                     className={`flex items-center px-3 py-2 text-xs font-medium rounded-md transition-all whitespace-nowrap ${isActive
-                                            ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                                            : 'text-white/60 hover:text-white/80'
+                                        ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                                        : 'text-white/60 hover:text-white/80'
                                         }`}
                                 >
                                     {item.label}
