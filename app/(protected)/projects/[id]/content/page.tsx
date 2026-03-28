@@ -114,7 +114,7 @@ export default function ProjectContentPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-white">Content</h1>
-          <p className="mt-1 text-sm text-slate-400">Generate and edit project content automatically via n8n.</p>
+          <p className="mt-1 text-sm text-slate-400">Generate and edit project content automatically.</p>
         </div>
 
         <div className="flex items-center gap-2">

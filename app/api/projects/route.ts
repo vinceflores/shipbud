@@ -1,6 +1,8 @@
 // export const runtime = "nodejs";
 import { auth0 } from '@/lib/auth0'
 import prisma from '@/lib/prisma'
+import { isProSubscription } from '@/lib/billing'
+import { getOrCreateTrialSubscription } from '@/lib/subscription'
 
 const PHASE_SEQUENCE = ['PLANNING', 'DESIGN', 'DEV', 'TESTING', 'DEPLOY'] as const
 
@@ -48,6 +50,24 @@ export async function POST(_req: Request) {
     const body = (await _req.json()) as CreateProjectBody
     const parsedBody = parseCreateProjectBody(body)
 
+    const subscription = await getOrCreateTrialSubscription(session.user.sub)
+
+    if (!isProSubscription(subscription)) {
+      const existingCount = await prisma.project.count({
+        where: { ownerId: session.user.sub },
+      })
+
+      if (existingCount >= 1) {
+        return Response.json(
+          {
+            error:
+              'Free plan accounts can create 1 project. Upgrade to Pro to create more.',
+          },
+          { status: 403 },
+        )
+      }
+    }
+
     const project = await prisma.$transaction(async (tx) => {
       const createdProject = await tx.project.create({
         data: {
@@ -84,12 +104,6 @@ export async function POST(_req: Request) {
         },
       })
 
-      await tx.driftMonitor.create({
-        data: {
-          projectId: createdProject.id,
-        },
-      })
-
       return tx.project.findUnique({
         where: { id: createdProject.id },
         include: {
@@ -97,7 +111,6 @@ export async function POST(_req: Request) {
             orderBy: { position: 'asc' },
           },
           activityLog: true,
-          driftMonitor: true,
         },
       })
     })

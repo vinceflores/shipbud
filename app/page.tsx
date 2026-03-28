@@ -28,10 +28,10 @@ export default function Home() {
       <header className="relative z-10">
         <div className="mx-auto max-w-7xl px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/60 to-violet-500/60 border border-white/[0.10] shadow-[0_0_50px_rgba(99,102,241,0.35)]" />
+            {/* <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/60 to-violet-500/60 border border-white/[0.10] shadow-[0_0_50px_rgba(99,102,241,0.35)]" /> */}
             <div className="leading-tight">
               <p className="text-sm font-semibold">ShipBud</p>
-              <p className="text-xs text-slate-400">Ship your build, fast</p>
+              <p className="text-xs text-slate-400">Plan, Develop, Reflect</p>
             </div>
           </div>
 
@@ -77,7 +77,7 @@ export default function Home() {
               </div>
               <p className="text-slate-300 text-base sm:text-lg leading-relaxed">
                 ShipBud wraps your entire build process — from idea to shipped —
-                and keeps you on track when momentum fades.
+                and keeps you track obstacles, and wins that keep you from shipping
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -94,11 +94,11 @@ export default function Home() {
                   href="/pricing"
                   className="inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-white/[0.04] border border-white/[0.10] text-slate-200 hover:border-white/[0.18] hover:bg-white/[0.06] transition-colors"
                 >
-                  14-day free trial (no credit card)
+                  30-day Pro trial (no card required)
                 </a>
               </div>
 
-              <div className="flex flex-wrap gap-2 pt-2 text-xs text-slate-300">
+              {/* <div className="flex flex-wrap gap-2 pt-2 text-xs text-slate-300">
                 <span className="rounded-full border border-white/[0.10] bg-white/[0.03] px-3 py-1">
                   Auth0-secured
                 </span>
@@ -111,7 +111,7 @@ export default function Home() {
                 <span className="rounded-full border border-white/[0.10] bg-white/[0.03] px-3 py-1">
                   Stripe billing
                 </span>
-              </div>
+              </div> */}
             </div>
 
             <div className="relative">
@@ -150,26 +150,14 @@ export default function Home() {
                     </div>
                     <div className="rounded-2xl border border-white/[0.10] bg-black/20 p-4">
                       <div className="flex items-center gap-2 text-slate-300">
-                        <Compass className="w-4 h-4 text-blue-300" />
-                        Drift Detection
-                      </div>
-                      <p className="mt-2 text-2xl font-semibold">
-                        No silent stalls
-                      </p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        N8N checks DEV+ activity
-                      </p>
-                    </div>
-                    <div className="rounded-2xl border border-white/[0.10] bg-black/20 p-4">
-                      <div className="flex items-center gap-2 text-slate-300">
                         <Bot className="w-4 h-4 text-violet-300" />
-                        Content Generation
+                        Docs Generator
                       </div>
                       <p className="mt-2 text-2xl font-semibold">
-                        Ship your story
+                        Scope clarified
                       </p>
                       <p className="text-xs text-slate-400 mt-1">
-                        Twitter, README, obstacles
+                        Requirements, design, RTM, tests
                       </p>
                     </div>
                   </div>
@@ -186,8 +174,7 @@ export default function Home() {
                           </Highlight>
                         </p>
                         <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                          Planning and gating happen on the server; automation
-                          and webhooks drive the rest.
+                          Planning to Reflection
                         </p>
                       </div>
                     </div>
@@ -210,8 +197,7 @@ export default function Home() {
                 The problem: your ideas stall before shipping.
               </h2>
               <p className="text-slate-300 mt-3 leading-relaxed">
-                ShipBud is built to turn “next steps” into momentum — and keep
-                it going.
+                ShipBud is built to manage your ideas into portfolio projects with the help of AI
               </p>
             </div>
 
@@ -222,7 +208,7 @@ export default function Home() {
                 </div>
                 <h3 className="mt-4 font-semibold">I start but never finish</h3>
                 <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                  A structured SDLC planner keeps your next actions clear.
+                  AI powered SDLC planner keeps your next actions clear.
                 </p>
               </div>
 
@@ -232,7 +218,7 @@ export default function Home() {
                 </div>
                 <h3 className="mt-4 font-semibold">I lose momentum</h3>
                 <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                  Drift detection watches activity and nudges before you stall.
+                  Journaling captures obstacles and decisions so you always know what to do next.
                 </p>
               </div>
 
@@ -240,9 +226,9 @@ export default function Home() {
                 <div className="w-10 h-10 rounded-2xl bg-white/[0.04] border border-white/[0.10] flex items-center justify-center">
                   <ShieldCheck className="w-5 h-5 text-slate-200" />
                 </div>
-                <h3 className="mt-4 font-semibold">Nobody sees what I build</h3>
+                <h3 className="mt-4 font-semibold">Docs fall behind</h3>
                 <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-                  Content generation helps you ship and tell the story.
+                  Generate SDLC docs from your plan so you can ship faster.
                 </p>
               </div>
             </div>
@@ -278,7 +264,7 @@ export default function Home() {
                 {
                   n: "03",
                   title: "Ship + tell the story",
-                  body: "Journal progress, detect drift, and generate shareable content.",
+                  body: "Journal progress and generate shareable content (README + posts + obstacles).",
                 },
               ].map((s) => (
                 <div
@@ -333,13 +319,8 @@ export default function Home() {
                 icon={<BookOpen className="w-5 h-5 text-violet-300" />}
               />
               <BentoGridItem
-                title="Drift Detection"
-                description="Server-checked momentum monitoring via n8n."
-                icon={<Gauge className="w-5 h-5 text-blue-300" />}
-              />
-              <BentoGridItem
-                title="Content Generation"
-                description="Pro-gated drafts for Twitter, README, and obstacles."
+                title="Docs Generator"
+                description="Generate requirements, design, RTM, and tests docs from your plan."
                 icon={<Bot className="w-5 h-5 text-violet-300" />}
               />
             </BentoGrid>
@@ -391,34 +372,31 @@ export default function Home() {
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Free Trial</h3>
                 <span className="text-xs px-3 py-1 rounded-full border border-white/[0.10] text-slate-200 bg-black/20">
-                  14 days
+                  30 days
                 </span>
               </div>
               <p className="mt-4 text-4xl font-semibold tracking-[-0.03em]">
                 $0
               </p>
               <p className="text-slate-400 text-sm mt-2">
-                No credit card required. After the trial, gated features are
-                disabled.
+                No card required. Your Pro trial starts on first login; add a
+                payment method anytime to keep Pro after your trial.
               </p>
 
               <div className="mt-6 space-y-3 text-sm">
-                {[
-                  "1 project",
-                  "Enabled drift detection",
-                  "Enabled content generation",
-                  "Todoist sync later",
-                ].map((t) => (
-                  <div
-                    key={t}
-                    className="flex items-center gap-2 text-slate-200"
-                  >
-                    <span className="w-5 h-5 rounded-full bg-green-500/15 border border-green-400/20 flex items-center justify-center">
-                      <span className="w-2 h-2 rounded-full bg-green-400" />
-                    </span>
-                    {t}
-                  </div>
-                ))}
+                {["1 project", "SDLC planning", "Journaling", "Docs generator"].map(
+                  (t) => (
+                    <div
+                      key={t}
+                      className="flex items-center gap-2 text-slate-200"
+                    >
+                      <span className="w-5 h-5 rounded-full bg-green-500/15 border border-green-400/20 flex items-center justify-center">
+                        <span className="w-2 h-2 rounded-full bg-green-400" />
+                      </span>
+                      {t}
+                    </div>
+                  ),
+                )}
               </div>
 
               <div className="mt-8">
@@ -452,9 +430,9 @@ export default function Home() {
                 <div className="mt-6 space-y-3 text-sm">
                   {[
                     "Unlimited projects",
-                    "Enabled drift detection",
-                    "Enabled content generation",
-                    "Todoist sync",
+                    "SDLC planning",
+                    "Journaling",
+                    "Docs generator",
                   ].map((t) => (
                     <div
                       key={t}
@@ -486,12 +464,12 @@ export default function Home() {
 
       <footer className="relative z-10 border-t border-white/[0.10]">
         <div className="mx-auto max-w-7xl px-6 py-10 flex flex-col md:flex-row gap-6 md:items-center md:justify-between">
-          <div>
+          {/* <div>
             <p className="text-sm font-semibold">Built with</p>
             <p className="text-slate-400 text-sm mt-1">
-              Next.js, Auth0, n8n, Prisma, Featherless AI
+              Next.js, Auth0, Prisma, Featherless AI
             </p>
-          </div>
+          </div> */}
 
           <div className="flex items-center gap-4 text-sm text-slate-300">
             <a

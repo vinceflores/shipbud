@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Settings } from "lucide-react";
 import { auth0 } from "@/lib/auth0";
+import { getOrCreateTrialSubscription } from "@/lib/subscription";
 import { ModeToggle } from "@/components/themes/toggle-dark-button";
 import UserButton from "@/components/auth0/user-button";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,8 @@ export default async function ProtectedLayout({
     if (!session?.user) {
         redirect("/auth/login");
     }
+
+    await getOrCreateTrialSubscription(session.user.sub);
 
     return (
         <div className="min-h-screen bg-[#060812] text-white">

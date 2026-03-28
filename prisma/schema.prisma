@@ -346,8 +346,8 @@ model ContentDraft {
 model Subscription {
   id               String    @id @default(uuid()) @db.Uuid 
   ownerId          String    @unique
-  stripeCustomerId String    @unique
-  stripeSubId      String    @unique
+  stripeCustomerId String?   @unique
+  stripeSubId      String?   @unique
   plan             PlanType  @default(FREE)
   status           String    // active | trialing | past_due | canceled
   trialEndsAt      DateTime?

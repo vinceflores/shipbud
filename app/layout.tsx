@@ -24,6 +24,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider defaultTheme="system">
           <Auth0Provider>
+            
             {children}
             <Toaster richColors closeButton position="top-right" />
           </Auth0Provider>

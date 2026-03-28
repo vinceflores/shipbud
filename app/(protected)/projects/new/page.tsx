@@ -50,6 +50,13 @@ export default function CreateProjectPage() {
       body: JSON.stringify(payload),
     });
 
+    if (res.status === 403) {
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      setError(data?.error ?? "Free plan accounts can create 1 project. Upgrade to Pro to create more.");
+      setIsSubmitting(false);
+      return;
+    }
+
     if (!res.ok) {
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       setError(data?.error ?? "Failed to create project.");
@@ -116,6 +123,14 @@ export default function CreateProjectPage() {
               </div>
 
               {error ? <p className="text-sm text-red-400">{error}</p> : null}
+
+              {error?.toLowerCase().includes("upgrade") ? (
+                <div>
+                  <Button asChild variant="outline" size="sm" disabled={isSubmitting}>
+                    <a href="/settings/billing">Go to billing</a>
+                  </Button>
+                </div>
+              ) : null}
 
               <div className="flex items-center gap-3">
                 <Button type="submit" disabled={isSubmitting}>
