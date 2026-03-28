@@ -46,10 +46,10 @@ export default async function BillingSettingsPage() {
                     <CardDescription className="text-slate-400">Manage your plan and billing details.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="grid grid-cols-1 text-white gap-4 md:grid-cols-2">
                         <div className="rounded-lg border border-white/10 bg-black/20 p-4">
                             <p className="text-xs text-white/60">Current plan</p>
-                            <p className="mt-1 text-lg font-semibold">{effectivePlan}</p>
+                            <p className="mt-1 text-lg font-semibold text-white">{effectivePlan}</p>
                         </div>
                         <div className="rounded-lg border border-white/10 bg-black/20 p-4">
                             <p className="text-xs text-white/60">Status</p>
@@ -77,7 +77,7 @@ export default async function BillingSettingsPage() {
                 </CardContent>
             </Card>
 
-            <Card className="border-white/10 bg-white/5">
+            <Card className="border-white/10 text-white bg-white/5">
                 <CardHeader>
                     <CardTitle>Invoices</CardTitle>
                     <CardDescription className="text-slate-400">

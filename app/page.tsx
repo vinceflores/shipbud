@@ -51,7 +51,7 @@ export default function Home() {
                 )}
               </div>
             )}
-            <ModeToggle />
+            {/* <ModeToggle /> */}
           </nav>
         </div>
       </header>

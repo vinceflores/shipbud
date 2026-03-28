@@ -42,7 +42,7 @@ export default async function PricingPage() {
               </Button>
             )}
 
-            <ModeToggle />
+            {/* <ModeToggle /> */}
           </nav>
         </div>
       </header>

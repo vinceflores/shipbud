@@ -34,7 +34,7 @@ export default async function ProtectedLayout({
                                 <Settings />
                             </Link>
                         </Button>
-                        <ModeToggle />
+                        {/* <ModeToggle /> */}
                         <UserButton user={session.user} logoutUrl="/auth/logout" />
                     </div>
                 </nav>
