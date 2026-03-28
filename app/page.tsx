@@ -13,10 +13,8 @@ import {
   Github,
   ShieldCheck,
 } from "lucide-react";
-import LogoutButton from "@/components/auth0/LogoutButton";
 import LoginButton from "@/components/auth0/LoginButton";
 import { useUser } from "@auth0/nextjs-auth0";
-import { ModeToggle } from "@/components/themes/toggle-dark-button";
 
 export default function Home() {
   const { user, isLoading } = useUser();
@@ -336,18 +334,20 @@ export default function Home() {
                 Demo video
               </h2>
               <p className="text-slate-300 mt-3 leading-relaxed">
-                Placeholder until your Day 28 recording. The UI will mirror the
-                flow in the design doc.
+                A quick walkthrough of the ShipBud flow.
               </p>
             </div>
             <div className="rounded-3xl border border-white/[0.10] bg-white/[0.03] p-5">
-              <div className="aspect-video w-full rounded-2xl border border-white/[0.10] bg-black/20 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-sm font-semibold">Demo placeholder</p>
-                  <p className="text-xs text-slate-400 mt-2">
-                    Embed YouTube or a direct MP4 when ready.
-                  </p>
-                </div>
+              <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/[0.10] bg-black/20">
+                <iframe
+                  className="h-full w-full"
+                  src="https://www.youtube.com/embed/uRpG3PNFx1k?rel=0"
+                  title="ShipBud demo"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allowFullScreen
+                  loading="lazy"
+                />
               </div>
             </div>
           </div>
